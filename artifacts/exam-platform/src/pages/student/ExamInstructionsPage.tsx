@@ -30,7 +30,7 @@ export default function ExamInstructionsPage() {
   const handleStart = () => {
     if (!exam || !agreed) return;
     startSession(exam.id, exam.durationMinutes);
-    setLocation(`/student/exams/${exam.id}/take`);
+    setLocation(`/student/exams/${exam.id}/code`);
   };
 
   if (loading || !exam) {
@@ -50,7 +50,7 @@ export default function ExamInstructionsPage() {
         <div className="grid grid-cols-3 gap-4 mb-6">
           {[
             { label: 'Duration', value: formatDuration(exam.durationMinutes), icon: <Clock className="w-4 h-4" /> },
-            { label: 'Questions', value: String(exam.totalQuestions), icon: <FileText className="w-4 h-4" /> },
+            { label: 'Problems', value: String(exam.totalQuestions), icon: <FileText className="w-4 h-4" /> },
             { label: 'Total Marks', value: String(exam.totalMarks), icon: <CheckCircle2 className="w-4 h-4" /> },
           ].map((m) => (
             <div key={m.label} className="bg-card border border-card-border rounded-xl p-4 text-center">
