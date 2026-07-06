@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/common/PageHeader';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { ErrorState } from '@/components/common/ErrorState';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Check } from 'lucide-react';
+import { useAllSettings } from '@/hooks/queries';
 
 interface GeneralSettings {
   platformName: string;
@@ -37,35 +40,66 @@ interface SecuritySettings {
 
 export default function SettingsPage() {
   const [savedSection, setSavedSection] = useState<string | null>(null);
+  const { data: settings, isLoading, isError, refetch } = useAllSettings();
 
   const [general, setGeneral] = useState<GeneralSettings>({
-    platformName: 'ExamPro',
-    institutionName: 'National Institute of Technology',
-    timezone: 'Asia/Kolkata',
-    supportEmail: 'admin@university.edu',
+    platformName: settings?.general?.platformName ?? 'ExamPro',
+    institutionName: settings?.general?.institutionName ?? 'National Institute of Technology',
+    timezone: settings?.general?.timezone ?? 'Asia/Kolkata',
+    supportEmail: settings?.general?.supportEmail ?? 'admin@university.edu',
   });
 
   const [examPolicy, setExamPolicy] = useState<ExamPolicySettings>({
-    maxDurationMinutes: '180',
-    negativeMarking: true,
-    defaultAllowedAttempts: '1',
-    autoSubmitOnTimeout: true,
-    showResultImmediately: true,
+    maxDurationMinutes: settings?.examPolicy?.maxDurationMinutes ?? '180',
+    negativeMarking: settings?.examPolicy?.negativeMarking ?? true,
+    defaultAllowedAttempts: settings?.examPolicy?.defaultAllowedAttempts ?? '1',
+    autoSubmitOnTimeout: settings?.examPolicy?.autoSubmitOnTimeout ?? true,
+    showResultImmediately: settings?.examPolicy?.showResultImmediately ?? true,
   });
 
   const [notifications, setNotifications] = useState<NotificationSettings>({
-    emailOnExamStart: true,
-    emailOnResult: true,
-    emailOnEnrollment: false,
+    emailOnExamStart: settings?.notifications?.emailOnExamStart ?? true,
+    emailOnResult: settings?.notifications?.emailOnResult ?? true,
+    emailOnEnrollment: settings?.notifications?.emailOnEnrollment ?? false,
   });
 
   const [security, setSecurity] = useState<SecuritySettings>({
-    sessionTimeoutMinutes: '30',
-    maxLoginAttempts: '5',
-    requirePasswordChange: false,
+    sessionTimeoutMinutes: settings?.security?.sessionTimeoutMinutes ?? '30',
+    maxLoginAttempts: settings?.security?.maxLoginAttempts ?? '5',
+    requirePasswordChange: settings?.security?.requirePasswordChange ?? false,
   });
 
+  // Update local state when settings load
+  useEffect(() => {
+    if (settings) {
+      setGeneral({
+        platformName: settings.general?.platformName ?? 'ExamPro',
+        institutionName: settings.general?.institutionName ?? 'National Institute of Technology',
+        timezone: settings.general?.timezone ?? 'Asia/Kolkata',
+        supportEmail: settings.general?.supportEmail ?? 'admin@university.edu',
+      });
+      setExamPolicy({
+        maxDurationMinutes: settings.examPolicy?.maxDurationMinutes ?? '180',
+        negativeMarking: settings.examPolicy?.negativeMarking ?? true,
+        defaultAllowedAttempts: settings.examPolicy?.defaultAllowedAttempts ?? '1',
+        autoSubmitOnTimeout: settings.examPolicy?.autoSubmitOnTimeout ?? true,
+        showResultImmediately: settings.examPolicy?.showResultImmediately ?? true,
+      });
+      setNotifications({
+        emailOnExamStart: settings.notifications?.emailOnExamStart ?? true,
+        emailOnResult: settings.notifications?.emailOnResult ?? true,
+        emailOnEnrollment: settings.notifications?.emailOnEnrollment ?? false,
+      });
+      setSecurity({
+        sessionTimeoutMinutes: settings.security?.sessionTimeoutMinutes ?? '30',
+        maxLoginAttempts: settings.security?.maxLoginAttempts ?? '5',
+        requirePasswordChange: settings.security?.requirePasswordChange ?? false,
+      });
+    }
+  }, [settings]);
+
   const handleSave = (section: string) => {
+    // TODO: Wire to real API when useUpdateSettings is available
     setSavedSection(section);
     setTimeout(() => setSavedSection(null), 2000);
   };
@@ -79,6 +113,22 @@ export default function SettingsPage() {
       )}
     </Button>
   );
+
+  if (isLoading) {
+    return (
+      <DashboardLayout breadcrumbs={['Admin', 'Settings']}>
+        <LoadingSpinner className="min-h-[400px]" message="Loading settings..." />
+      </DashboardLayout>
+    );
+  }
+
+  if (isError) {
+    return (
+      <DashboardLayout breadcrumbs={['Admin', 'Settings']}>
+        <ErrorState onRetry={refetch} />
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout breadcrumbs={['Admin', 'Settings']}>

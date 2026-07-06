@@ -7,12 +7,12 @@ import {
 import { CodeEditor } from '@/components/exam/CodeEditor';
 import { Button } from '@/components/ui/button';
 import { examService } from '@/services/exam.service';
-import { getCodingProblemsByExamId } from '@/data/mock-coding-problems';
-import {
+import type {
   Language, CodingProblem, TestRunResult, CodeSubmission,
-  LANGUAGE_LABELS, StarterCode,
+  StarterCode,
 } from '@/types/coding.types';
-import { Exam } from '@/types';
+import { LANGUAGE_LABELS } from '@/types/coding.types';
+import type { Exam } from '@/types';
 import { cn } from '@/utils/cn';
 
 type PanelTab = 'problem' | 'testcases' | 'output';
@@ -29,7 +29,6 @@ const DIFFICULTY_COLOR: Record<string, string> = {
 function simulateRun(problem: CodingProblem, language: Language, code: string): Promise<TestRunResult[]> {
   return new Promise((resolve) => {
     setTimeout(() => {
-      // Simulate: pass examples, simulate hidden test results
       const results: TestRunResult[] = problem.examples.map((tc) => ({
         testCaseId: tc.id,
         input: tc.input,
@@ -81,27 +80,24 @@ export default function CodingExamScreen() {
   const [descCollapsed, setDescCollapsed] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Load exam + problems
   useEffect(() => {
     if (!examId) return;
-    Promise.all([examService.getExamById(examId), Promise.resolve(getCodingProblemsByExamId(examId))]).then(
-      ([e, ps]) => {
-        setExam(e);
-        const resolvedProblems = ps.length > 0 ? ps : getFallbackProblems(examId);
-        setProblems(resolvedProblems);
-        setTimeLeft(e.durationMinutes * 60);
-        // Init code with starter code
-        const initCodes: Record<string, Record<Language, string>> = {};
-        resolvedProblems.forEach((p) => {
-          initCodes[p.id] = { ...p.starterCode } as Record<Language, string>;
-        });
-        setCodes(initCodes);
-        setLoading(false);
-      }
-    );
+    examService.getExamById(examId).then((e) => {
+      setExam(e);
+      const fallbackProblems = getFallbackProblems(examId);
+      setProblems(fallbackProblems);
+      setTimeLeft((e?.durationMinutes ?? 60) * 60);
+      const initCodes: Record<string, Record<Language, string>> = {};
+      fallbackProblems.forEach((p) => {
+        initCodes[p.id] = { ...p.starterCode } as Record<Language, string>;
+      });
+      setCodes(initCodes);
+      setLoading(false);
+    }).catch(() => {
+      setLoading(false);
+    });
   }, [examId]);
 
-  // Countdown timer
   useEffect(() => {
     if (!exam || timeLeft <= 0) return;
     timerRef.current = setInterval(() => {
@@ -117,7 +113,6 @@ export default function CodingExamScreen() {
     return () => clearInterval(timerRef.current!);
   }, [exam]);
 
-  // Warn on unload
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', handler);

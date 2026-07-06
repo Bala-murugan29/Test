@@ -1,25 +1,20 @@
-import app from "./app";
-import { logger } from "./lib/logger";
+import { buildApp, startApp } from "./app";
+import { env } from "./config/env";
 
-const rawPort = process.env["PORT"];
+async function main() {
+  const app = buildApp();
 
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
-const port = Number(rawPort);
-
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
-
-app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
+  try {
+    await startApp(app);
+  } catch (error) {
+    app.log.error({ err: error }, "Server failed to start");
     process.exit(1);
   }
 
-  logger.info({ port }, "Server listening");
-});
+  app.log.info(
+    { host: env.HOST, port: env.PORT },
+    "Server listening",
+  );
+}
+
+void main();

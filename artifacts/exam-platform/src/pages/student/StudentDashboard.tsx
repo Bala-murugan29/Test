@@ -59,7 +59,7 @@ export default function StudentDashboard() {
     <DashboardLayout breadcrumbs={['Student', 'Dashboard']}>
       <PageHeader
         title={`Welcome back, ${user?.name?.split(' ')[0]}`}
-        subtitle={`${user?.department} · Roll No: ${user?.rollNumber}`}
+        subtitle={user?.department}
       />
 
       {/* Stats */}

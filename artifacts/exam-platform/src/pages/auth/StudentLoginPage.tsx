@@ -5,36 +5,49 @@ import { AuthLayout } from '@/components/layout/AuthLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Info } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+import { toApiError } from '@/lib/axios';
+import { ArrowLeft } from 'lucide-react';
 
 export default function StudentLoginPage() {
-  const { loginAs } = useAuth();
+  const { login } = useAuth();
   const [, setLocation] = useLocation();
-  const [rollNumber, setRollNumber] = useState('CS2021001');
-  const [password, setPassword] = useState('password');
+  const [email, setEmail] = useState('arjun.sharma@university.edu');
+  const [password, setPassword] = useState('password123');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rollNumber.trim()) return;
+    if (!email.trim()) return;
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 500));
-    loginAs('student');
-    setLocation('/student/dashboard');
+    try {
+      await login(email, password);
+      setLocation('/student/dashboard');
+    } catch (err) {
+      const apiErr = toApiError(err);
+      toast({
+        variant: 'destructive',
+        title: 'Sign in failed',
+        description: apiErr.message,
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <AuthLayout title="Student Sign In" subtitle="Enter your credentials to access your exams">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4" data-testid="form-student-login">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="rollNumber">Roll Number</Label>
+          <Label htmlFor="email">Email Address</Label>
           <Input
-            id="rollNumber"
-            value={rollNumber}
-            onChange={(e) => setRollNumber(e.target.value)}
-            placeholder="e.g. CS2021001"
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="your.email@university.edu"
             required
-            data-testid="input-roll-number"
+            data-testid="input-email"
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -48,11 +61,6 @@ export default function StudentLoginPage() {
             required
             data-testid="input-password"
           />
-        </div>
-
-        <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-accent text-accent-foreground text-xs">
-          <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-          <span>Demo mode — any credentials will sign you in.</span>
         </div>
 
         <Button type="submit" disabled={loading} className="w-full mt-1" data-testid="button-login">

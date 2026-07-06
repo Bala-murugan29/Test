@@ -47,7 +47,7 @@ export default function FacultyDashboard() {
     <DashboardLayout breadcrumbs={['Faculty', 'Dashboard']}>
       <PageHeader
         title={`Welcome, ${user?.name}`}
-        subtitle={`${user?.department} · ${user?.employeeId}`}
+        subtitle={user?.department}
         actions={
           <Button onClick={() => setLocation('/faculty/exams/create')} data-testid="button-create-exam">
             <Plus className="w-4 h-4 mr-1.5" /> Create Exam

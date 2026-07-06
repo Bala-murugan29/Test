@@ -1,70 +1,234 @@
-import { Exam, StudentExam, Question } from '../types';
-import { exams, studentExams, getExamById } from '../data/mock-exams';
-import { getQuestionsByExamId } from '../data/mock-questions';
+import { apiGet, apiPost, apiPut } from '@/lib/axios';
+import type { Exam, StudentExam, Question } from '@/types';
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/* ---------- backend shapes ---------- */
+
+interface BackendExamQuestion {
+  questionId: string;
+  sequenceNo: number;
+  marksOverride: number | null;
+  negativeMarks: number;
+  isMandatory: boolean;
+}
+
+interface BackendExamListItem {
+  id: string;
+  courseId: string;
+  courseTitle: string | null;
+  title: string;
+  instructions: string | null;
+  durationMinutes: number;
+  totalMarks: number;
+  passMarks: number;
+  status: string;
+  startsAt: string | null;
+  endsAt: string | null;
+  randomizeQuestions: boolean;
+  allowReview: boolean;
+  attemptLimit: number;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface BackendExamDetail extends BackendExamListItem {
+  questions: BackendExamQuestion[];
+}
+
+interface BackendQuestion {
+  id: string;
+  departmentId: string;
+  createdByUserId: string | null;
+  type: string;
+  status: string;
+  title: string;
+  prompt: string;
+  explanation: string | null;
+  difficulty: number;
+  marks: number;
+  timeLimitSeconds: number | null;
+  tags: string[] | null;
+  createdAt: string;
+  updatedAt: string;
+  mcq: {
+    options: { text: string }[];
+    correctOptionIndex: number;
+    shuffleOptions: boolean;
+    answerExplanation: string | null;
+  } | null;
+  coding: {
+    starterCode: string | null;
+    testCases: { input: string; expectedOutput: string }[];
+    languageConstraints: string[] | null;
+    sampleInput: string | null;
+    sampleOutput: string | null;
+  } | null;
+}
+
+interface Paginated<T> {
+  data: T[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
+}
+
+/* ---------- mappers ---------- */
+
+const STATUS_MAP: Record<string, Exam['status']> = {
+  DRAFT: 'draft',
+  SCHEDULED: 'published',
+  ACTIVE: 'ongoing',
+  ENDED: 'completed',
+  ARCHIVED: 'cancelled',
+};
+
+function mapExam(e: BackendExamListItem | BackendExamDetail): Exam {
+  const detail = 'questions' in e ? e : null;
+  return {
+    id: e.id,
+    title: e.title,
+    subject: e.courseTitle ?? '',
+    department: '',
+    facultyId: '',
+    facultyName: '',
+    totalMarks: e.totalMarks,
+    passingMarks: e.passMarks,
+    durationMinutes: e.durationMinutes,
+    totalQuestions: detail ? detail.questions.length : 0,
+    status: STATUS_MAP[e.status] ?? 'draft',
+    scheduledAt: e.startsAt ?? '',
+    endsAt: e.endsAt ?? '',
+    instructions: e.instructions ? [e.instructions] : [],
+    allowedAttempts: e.attemptLimit ?? 1,
+  };
+}
+
+function mapQuestion(q: BackendQuestion, examId: string): Question {
+  return {
+    id: q.id,
+    examId,
+    text: q.prompt,
+    type: q.type === 'MCQ' ? 'mcq' : 'mcq',
+    options: q.mcq?.options.map((o, i) => ({ id: String(i), text: o.text })) ?? [],
+    correctOptionId: q.mcq ? String(q.mcq.correctOptionIndex) : '',
+    marks: q.marks,
+    negativeMarks: 0,
+  };
+}
+
+async function fetchAllExams(params?: Record<string, string | number>): Promise<BackendExamListItem[]> {
+  const all: BackendExamListItem[] = [];
+  let page = 1;
+  while (true) {
+    const res = await apiGet<Paginated<BackendExamListItem>>('/exams', { params: { page, limit: 100, ...params } });
+    all.push(...res.data);
+    if (page >= res.meta.totalPages) break;
+    page++;
+  }
+  return all;
+}
+
+/* ---------- public service ---------- */
 
 export const examService = {
-  getStudentExams: async (_studentId: string): Promise<StudentExam[]> => {
-    await delay(400);
-    return studentExams;
+  async getStudentExams(_studentId: string): Promise<StudentExam[]> {
+    const [active, scheduled, ended] = await Promise.all([
+      fetchAllExams({ status: 'ACTIVE' }).catch(() => []),
+      fetchAllExams({ status: 'SCHEDULED' }).catch(() => []),
+      fetchAllExams({ status: 'ENDED' }).catch(() => []),
+    ]);
+    const allExams = [...active, ...scheduled, ...ended];
+    return allExams.map((e) => ({
+      ...mapExam(e),
+      attemptsMade: 0,
+      lastScore: undefined,
+      isPassed: undefined,
+    }));
   },
 
-  getExamById: async (examId: string): Promise<Exam> => {
-    await delay(300);
-    const exam = getExamById(examId);
-    if (!exam) throw new Error(`Exam with id "${examId}" not found.`);
-    return exam;
+  async getExamById(examId: string): Promise<Exam | null> {
+    try {
+      const detail = await apiGet<BackendExamDetail>(`/exams/${examId}`);
+      return mapExam(detail);
+    } catch {
+      return null;
+    }
   },
 
-  getExamQuestions: async (examId: string): Promise<Question[]> => {
-    await delay(500);
-    return getQuestionsByExamId(examId);
+  async getExamQuestions(examId: string): Promise<Question[]> {
+    try {
+      const detail = await apiGet<BackendExamDetail>(`/exams/${examId}`);
+      const questions = await Promise.all(
+        detail.questions.map((eq) => apiGet<BackendQuestion>(`/questions/${eq.questionId}`)),
+      );
+      return questions.map((q) => mapQuestion(q, examId));
+    } catch {
+      return [];
+    }
   },
 
-  getFacultyExams: async (facultyId: string): Promise<Exam[]> => {
-    await delay(400);
-    return exams.filter((e) => e.facultyId === facultyId);
+  async getFacultyExams(_facultyId: string): Promise<Exam[]> {
+    const all = await fetchAllExams();
+    return all.map(mapExam);
   },
 
-  getAllExams: async (): Promise<Exam[]> => {
-    await delay(400);
-    return exams;
+  async getAllExams(): Promise<Exam[]> {
+    const all = await fetchAllExams();
+    return all.map(mapExam);
   },
 
-  createExam: async (data: Partial<Exam>): Promise<Exam> => {
-    await delay(600);
-    const newExam: Exam = {
-      id: `exam${String(Date.now()).slice(-4)}`,
-      title: data.title ?? 'New Exam',
-      subject: data.subject ?? '',
-      department: data.department ?? '',
-      facultyId: data.facultyId ?? 'f001',
-      facultyName: data.facultyName ?? 'Dr. Priya Mehta',
-      totalMarks: data.totalMarks ?? 100,
-      passingMarks: data.passingMarks ?? 40,
+  async createExam(data: Partial<Exam>): Promise<Exam> {
+    let courseId = '';
+    try {
+      const depts = await apiGet<Paginated<{ id: string }>>('/departments', { params: { page: 1, limit: 1 } });
+      if (depts.data.length > 0) {
+        const deptId = depts.data[0].id;
+        try {
+          const courses = await apiGet<Paginated<{ id: string }>>(`/departments/${deptId}/courses`);
+          if (courses.data.length > 0) courseId = courses.data[0].id;
+        } catch { /* no courses */ }
+        if (!courseId) {
+          const course = await apiPost<{ id: string }>(`/departments/${deptId}/courses`, {
+            code: data.subject?.slice(0, 10) ?? 'EXAM101',
+            title: data.subject ?? 'General',
+            credits: 3,
+          });
+          courseId = course.id;
+        }
+      }
+    } catch { /* fallback */ }
+
+    const body = {
+      courseId,
+      title: data.title ?? '',
+      instructions: data.instructions?.join('\n') ?? '',
       durationMinutes: data.durationMinutes ?? 60,
-      totalQuestions: data.totalQuestions ?? 50,
-      status: 'draft',
-      scheduledAt: data.scheduledAt ?? new Date().toISOString(),
-      endsAt: data.endsAt ?? new Date().toISOString(),
-      instructions: data.instructions ?? [],
-      allowedAttempts: data.allowedAttempts ?? 1,
+      totalMarks: data.totalMarks ?? 100,
+      passMarks: data.passingMarks ?? 40,
+      startsAt: data.scheduledAt || undefined,
+      endsAt: data.endsAt || undefined,
+      attemptLimit: data.allowedAttempts ?? 1,
     };
-    return newExam;
+
+    const created = await apiPost<BackendExamListItem>('/exams', body);
+    return mapExam(created);
   },
 
-  updateExam: async (examId: string, data: Partial<Exam>): Promise<Exam> => {
-    await delay(500);
-    const exam = getExamById(examId);
-    if (!exam) throw new Error(`Exam "${examId}" not found.`);
-    return { ...exam, ...data };
+  async updateExam(examId: string, data: Partial<Exam>): Promise<Exam> {
+    const body: Record<string, unknown> = {};
+    if (data.title !== undefined) body.title = data.title;
+    if (data.instructions) body.instructions = data.instructions.join('\n');
+    if (data.durationMinutes !== undefined) body.durationMinutes = data.durationMinutes;
+    if (data.totalMarks !== undefined) body.totalMarks = data.totalMarks;
+    if (data.passingMarks !== undefined) body.passMarks = data.passingMarks;
+    if (data.scheduledAt !== undefined) body.startsAt = data.scheduledAt;
+    if (data.endsAt !== undefined) body.endsAt = data.endsAt;
+    if (data.allowedAttempts !== undefined) body.attemptLimit = data.allowedAttempts;
+
+    const updated = await apiPut<BackendExamListItem>(`/exams/${examId}`, body);
+    return mapExam(updated);
   },
 
-  publishExam: async (examId: string): Promise<Exam> => {
-    await delay(500);
-    const exam = getExamById(examId);
-    if (!exam) throw new Error(`Exam "${examId}" not found.`);
-    return { ...exam, status: 'published' };
+  async publishExam(examId: string): Promise<Exam> {
+    const updated = await apiPut<BackendExamListItem>(`/exams/${examId}/publish`);
+    return mapExam(updated);
   },
 };

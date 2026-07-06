@@ -10,6 +10,33 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: users
+    description: User management operations
+  - name: students
+    description: Student management operations
+  - name: faculty
+    description: Faculty management operations
+  - name: departments
+    description: Department operations
+  - name: courses
+    description: Course operations
+  - name: exams
+    description: Exam operations
+  - name: questions
+    description: Question bank operations
+  - name: sessions
+    description: Exam session operations
+  - name: results
+    description: Result operations
+  - name: analytics
+    description: Analytics operations
+  - name: reports
+    description: Report operations
+security:
+  - bearerAuth: []
+
 paths:
   /healthz:
     get:
@@ -24,7 +51,396 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      description: Create a new user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      description: Authenticate user and return tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/refresh:
+    post:
+      operationId: refreshToken
+      tags: [auth]
+      summary: Refresh access token
+      description: Exchange a valid refresh token for a new token pair
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout and revoke refresh token
+      description: Revoke the given refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user profile
+      description: Returns the authenticated user's profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/password:
+    put:
+      operationId: changePassword
+      tags: [auth]
+      summary: Change password
+      description: Change the authenticated user's password
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "401":
+          description: Current password incorrect
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List users
+      description: Get paginated list of users with optional filters
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [student, faculty, admin]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, INVITED, SUSPENDED, DISABLED]
+      responses:
+        "200":
+          description: Paginated users list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedUsersResponse"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a new user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+
+  /users/{id}:
+    get:
+      operationId: getUserById
+      tags: [users]
+      summary: Get user by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+    put:
+      operationId: updateUser
+      tags: [users]
+      summary: Update user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /users/{id}/status:
+    put:
+      operationId: updateUserStatus
+      tags: [users]
+      summary: Update user status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserStatusRequest"
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+
+  /users/{id}/roles:
+    get:
+      operationId: getUserRoles
+      tags: [users]
+      summary: Get user roles
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: User roles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserRoleResponse"
+    post:
+      operationId: assignRole
+      tags: [users]
+      summary: Assign role to user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignRoleRequest"
+      responses:
+        "200":
+          description: Role assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /users/{id}/roles/{roleId}:
+    delete:
+      operationId: removeRole
+      tags: [users]
+      summary: Remove role from user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Role removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +450,188 @@ components:
       required:
         - status
 
+    RegisterRequest:
+      type: object
+      required: [email, password, fullName]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+        fullName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        phone:
+          type: string
+        role:
+          type: string
+          enum: [student, faculty, admin]
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 8
+          maxLength: 128
+
+    AuthResponse:
+      type: object
+      required: [user, accessToken, refreshToken]
+      properties:
+        user:
+          $ref: "#/components/schemas/UserResponse"
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+
+    UserResponse:
+      type: object
+      required: [id, email, fullName, status, roles, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [ACTIVE, INVITED, SUSPENDED, DISABLED]
+        roles:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    MessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        requestId:
+          type: string
+
+    CreateUserRequest:
+      type: object
+      required: [email, password, fullName, role]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+        fullName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        phone:
+          type: string
+        role:
+          type: string
+          enum: [student, faculty, admin]
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        fullName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+
+    UpdateUserStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ACTIVE, INVITED, SUSPENDED, DISABLED]
+
+    AssignRoleRequest:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [student, faculty, admin]
+
+    PaginatedUsersResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserResponse"
+        meta:
+          type: object
+          required: [page, limit, total, totalPages]
+          properties:
+            page:
+              type: integer
+            limit:
+              type: integer
+            total:
+              type: integer
+            totalPages:
+              type: integer
+
+    UserRoleResponse:
+      type: object
+      required: [roleId, key, name, assignedAt]
+      properties:
+        roleId:
+          type: string
+        key:
+          type: string
+        name:
+          type: string
+        assignedAt:
+          type: string

@@ -8,9 +8,8 @@ import { PassRateDonutChart } from '@/components/charts/PassRateDonutChart';
 import { Button } from '@/components/ui/button';
 import { resultService } from '@/services/result.service';
 import { examService } from '@/services/exam.service';
-import { ExamResult, Exam, Question } from '@/types';
+import type { ExamResult, Exam, Question } from '@/types';
 import { formatDateTime, formatDuration, formatScore } from '@/utils/format';
-import { getQuestionsByExamId } from '@/data/mock-questions';
 
 export default function ResultScreen() {
   const { examId } = useParams<{ examId: string }>();
@@ -23,14 +22,17 @@ export default function ResultScreen() {
   useEffect(() => {
     if (!examId) return;
     const load = async () => {
-      const [allResults, e] = await Promise.all([
-        resultService.getStudentResults('s001'),
-        examService.getExamById(examId),
-      ]);
-      const r = allResults.find((x) => x.examId === examId) ?? allResults[0];
-      setResult(r ?? null);
-      setExam(e);
-      setQuestions(getQuestionsByExamId(examId));
+      try {
+        const [allResults, e] = await Promise.all([
+          resultService.getStudentResults('s001'),
+          examService.getExamById(examId),
+        ]);
+        const r = allResults.find((x) => x.examId === examId) ?? allResults[0];
+        setResult(r ?? null);
+        setExam(e);
+      } catch {
+        // API not wired yet
+      }
       setLoading(false);
     };
     load();

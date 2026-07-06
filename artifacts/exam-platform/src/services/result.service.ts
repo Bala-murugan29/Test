@@ -1,69 +1,150 @@
-import { ExamResult, SubmissionAnswer } from '../types';
-import { results, getResultsByStudentId, getResultsByExamId, getResultById } from '../data/mock-results';
-import { getQuestionsByExamId } from '../data/mock-questions';
-import { getExamById } from '../data/mock-exams';
+import { apiGet, apiPost } from '@/lib/axios';
+import type { ExamResult, SubmissionAnswer } from '@/types';
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/* ---------- backend shapes ---------- */
+
+interface BackendResult {
+  id: string;
+  sessionId: string;
+  obtainedMarks: number;
+  maxMarks: number;
+  percentage: number;
+  passed: boolean;
+  grade: string | null;
+  remarks: string | null;
+  breakdown: unknown;
+  evaluatedAt: string;
+  createdAt: string;
+  session?: {
+    examId: string;
+    attemptNo: number;
+    exam?: { title: string; courseId: string };
+  };
+}
+
+interface Paginated<T> {
+  data: T[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
+}
+
+/* ---------- mapper ---------- */
+
+function mapResult(r: BackendResult): ExamResult {
+  const breakdown = (r.breakdown as SubmissionAnswer[] | undefined) ?? [];
+  return {
+    id: r.id,
+    examId: r.session?.examId ?? '',
+    studentId: '',
+    studentName: '',
+    totalMarks: r.maxMarks,
+    obtainedMarks: r.obtainedMarks,
+    percentage: Math.round(r.percentage * 100) / 100,
+    isPassed: r.passed,
+    timeTakenMinutes: 0,
+    submittedAt: r.evaluatedAt,
+    answers: breakdown,
+    rank: undefined,
+    totalStudents: undefined,
+  };
+}
+
+async function fetchAllResults(url: string): Promise<BackendResult[]> {
+  const all: BackendResult[] = [];
+  let page = 1;
+  while (true) {
+    const res = await apiGet<Paginated<BackendResult>>(url, { params: { page, limit: 100 } });
+    all.push(...res.data);
+    if (page >= res.meta.totalPages) break;
+    page++;
+  }
+  return all;
+}
+
+/* ---------- public service ---------- */
 
 export const resultService = {
-  submitExam: async (
+  async submitExam(
     examId: string,
-    studentId: string,
-    answers: Record<string, string>
-  ): Promise<ExamResult> => {
-    await delay(800);
-    const exam = getExamById(examId);
-    const questions = getQuestionsByExamId(examId);
+    _studentId: string,
+    answers: Record<string, string>,
+  ): Promise<ExamResult> {
+    // 1. Start a session (or get existing one).
+    let sessionId = '';
+    try {
+      const session = await apiPost<{ id: string }>('/sessions', { examId });
+      sessionId = session.id;
+    } catch {
+      // Session may already exist — try to find it.
+      const sessions = await apiGet<Paginated<{ id: string; status: string }>>(`/exams/${examId}/sessions`, {
+        params: { page: 1, limit: 1 },
+      });
+      if (sessions.data.length > 0) {
+        sessionId = sessions.data[0].id;
+      } else {
+        throw new Error('Could not start or find exam session.');
+      }
+    }
 
-    if (!exam) throw new Error('Exam not found.');
+    // 2. Save all answers via autosave.
+    const answerEntries = Object.entries(answers).map(([questionId, selectedOptionId]) => ({
+      questionId,
+      selectedOptionIndex: parseInt(selectedOptionId, 10),
+    }));
+    await apiPost(`/sessions/${sessionId}/answers`, { answers: answerEntries });
 
-    const answerRecords: SubmissionAnswer[] = questions.map((q) => {
-      const selected = answers[q.id] ?? '';
-      const isCorrect = selected !== '' && selected === q.correctOptionId;
-      const marksAwarded = !selected ? 0 : isCorrect ? q.marks : -q.negativeMarks;
-      return { questionId: q.id, selectedOptionId: selected, isCorrect, marksAwarded };
+    // 3. Submit the session.
+    await apiPost(`/sessions/${sessionId}/submit`);
+
+    // 4. Evaluate the result.
+    const results = await apiGet<Paginated<BackendResult>>(`/exams/${examId}/results`, {
+      params: { page: 1, limit: 1 },
     });
+    if (results.data.length > 0) {
+      return mapResult(results.data[0]);
+    }
 
-    const obtainedMarks = Math.max(
-      0,
-      answerRecords.reduce((sum, a) => sum + a.marksAwarded, 0)
-    );
-    const percentage = exam.totalMarks > 0 ? (obtainedMarks / exam.totalMarks) * 100 : 0;
-
-    const result: ExamResult = {
-      id: `res${Date.now()}`,
+    // Fallback result if evaluation isn't immediate.
+    return {
+      id: 'pending',
       examId,
-      studentId,
-      studentName: 'Arjun Sharma',
-      totalMarks: exam.totalMarks,
-      obtainedMarks,
-      percentage: Math.round(percentage * 10) / 10,
-      isPassed: obtainedMarks >= exam.passingMarks,
-      timeTakenMinutes: Math.floor(exam.durationMinutes * 0.8),
+      studentId: _studentId,
+      studentName: '',
+      totalMarks: 100,
+      obtainedMarks: 0,
+      percentage: 0,
+      isPassed: false,
+      timeTakenMinutes: 0,
       submittedAt: new Date().toISOString(),
-      rank: Math.floor(Math.random() * 30) + 1,
-      totalStudents: 48,
-      answers: answerRecords,
+      answers: [],
+      rank: undefined,
+      totalStudents: undefined,
     };
-
-    results.push(result);
-    return result;
   },
 
-  getStudentResults: async (studentId: string): Promise<ExamResult[]> => {
-    await delay(400);
-    return getResultsByStudentId(studentId);
+  async getStudentResults(studentId: string): Promise<ExamResult[]> {
+    try {
+      const results = await fetchAllResults(`/students/${studentId}/results`);
+      return results.map(mapResult);
+    } catch {
+      return [];
+    }
   },
 
-  getExamResults: async (examId: string): Promise<ExamResult[]> => {
-    await delay(400);
-    return getResultsByExamId(examId);
+  async getExamResults(examId: string): Promise<ExamResult[]> {
+    try {
+      const results = await fetchAllResults(`/exams/${examId}/results`);
+      return results.map(mapResult);
+    } catch {
+      return [];
+    }
   },
 
-  getResultById: async (resultId: string): Promise<ExamResult> => {
-    await delay(300);
-    const result = getResultById(resultId);
-    if (!result) throw new Error(`Result "${resultId}" not found.`);
-    return result;
+  async getResultById(resultId: string): Promise<ExamResult | null> {
+    try {
+      const r = await apiGet<BackendResult>(`/results/${resultId}`);
+      return mapResult(r);
+    } catch {
+      return null;
+    }
   },
 };

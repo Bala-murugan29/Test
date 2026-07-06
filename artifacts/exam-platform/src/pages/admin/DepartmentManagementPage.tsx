@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { departmentStats } from '@/data/mock-analytics';
 
 interface Department {
   id: string;
@@ -17,13 +16,7 @@ interface Department {
   totalExams: number;
 }
 
-const initialDepartments: Department[] = departmentStats.map((d, i) => ({
-  id: `dept${i + 1}`,
-  name: d.department,
-  studentCount: d.totalStudents,
-  facultyCount: Math.round(d.totalStudents / 20),
-  totalExams: Math.round(d.totalStudents / 8),
-}));
+const initialDepartments: Department[] = [];
 
 export default function DepartmentManagementPage() {
   const [departments, setDepartments] = useState<Department[]>(initialDepartments);

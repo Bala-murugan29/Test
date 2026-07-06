@@ -7,7 +7,21 @@ import { SearchInput } from '@/components/common/SearchInput';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EmptyState } from '@/components/common/EmptyState';
 import { useDebounce } from '@/hooks/useDebounce';
-import { studentRecords, StudentRecord } from '@/data/mock-students';
+
+interface StudentRecord {
+  id: string;
+  rollNumber: string;
+  name: string;
+  email: string;
+  department: string;
+  year: number;
+  cgpa: number;
+  examsTaken: number;
+  examsCleared: number;
+  avgScore: number;
+  status: 'active' | 'suspended';
+  enrolledAt: string;
+}
 
 const DEPARTMENTS = ['All', 'Computer Science', 'Electronics', 'Mechanical', 'Civil', 'Information Technology'];
 
@@ -19,10 +33,8 @@ export default function StudentManagementPage() {
   const debouncedSearch = useDebounce(search, 300);
 
   useEffect(() => {
-    setTimeout(() => {
-      setRecords(studentRecords);
-      setLoading(false);
-    }, 400);
+    // TODO: wire to real API
+    setLoading(false);
   }, []);
 
   const filtered = records.filter((s) => {
