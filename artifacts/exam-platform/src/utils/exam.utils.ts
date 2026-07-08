@@ -43,6 +43,7 @@ export function getExamStatusColor(status: ExamStatus): string {
     ongoing: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
     completed: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
     cancelled: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    missed: 'bg-orange-100 text-orange-800 dark:bg-orange-950/30 dark:text-orange-400',
   };
   return map[status];
 }
@@ -54,6 +55,7 @@ export function getStatusLabel(status: ExamStatus): string {
     ongoing: 'Live',
     completed: 'Completed',
     cancelled: 'Cancelled',
+    missed: 'Missed',
   };
   return map[status];
 }

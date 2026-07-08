@@ -1,5 +1,5 @@
 import { apiGet, apiPost } from '@/lib/axios';
-import type { ExamResult, SubmissionAnswer } from '@/types';
+import type { ExamResult } from '@/types';
 
 /* ---------- backend shapes ---------- */
 
@@ -30,7 +30,8 @@ interface Paginated<T> {
 /* ---------- mapper ---------- */
 
 function mapResult(r: BackendResult): ExamResult {
-  const breakdown = (r.breakdown as SubmissionAnswer[] | undefined) ?? [];
+  // Backend breakdown is a summary object (not per-answer array).
+  // answers[] is not available from the list endpoint.
   return {
     id: r.id,
     examId: r.session?.examId ?? '',
@@ -42,22 +43,20 @@ function mapResult(r: BackendResult): ExamResult {
     isPassed: r.passed,
     timeTakenMinutes: 0,
     submittedAt: r.evaluatedAt,
-    answers: breakdown,
+    answers: [],
     rank: undefined,
     totalStudents: undefined,
   };
 }
 
 async function fetchAllResults(url: string): Promise<BackendResult[]> {
-  const all: BackendResult[] = [];
-  let page = 1;
-  while (true) {
-    const res = await apiGet<Paginated<BackendResult>>(url, { params: { page, limit: 100 } });
-    all.push(...res.data);
-    if (page >= res.meta.totalPages) break;
-    page++;
+  // The student/exam results endpoints return a plain array, not paginated.
+  const res = await apiGet<Paginated<BackendResult> | BackendResult[]>(url);
+  if (Array.isArray(res)) {
+    return res;
   }
-  return all;
+  // Paginated response
+  return res.data;
 }
 
 /* ---------- public service ---------- */

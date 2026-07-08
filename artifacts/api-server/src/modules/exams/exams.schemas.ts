@@ -65,6 +65,7 @@ const examListItemSchema = z.object({
   allowReview: z.boolean(),
   attemptLimit: z.number(),
   publishedAt: z.string().datetime().nullable().optional(),
+  questionCount: z.number(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });

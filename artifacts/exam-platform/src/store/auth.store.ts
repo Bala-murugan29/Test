@@ -85,7 +85,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   setUser: (userResponse) => {
     const user = mapUser(userResponse);
-    set({ user, role: user.role });
+    set({ status: 'authenticated', user, role: user.role });
   },
 
   clearAuth: () => {

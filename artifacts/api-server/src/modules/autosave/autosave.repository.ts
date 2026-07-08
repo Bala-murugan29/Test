@@ -12,7 +12,7 @@ export async function findSessionForSave(
     where: {
       id: sessionId,
       studentUserId,
-      status: "IN_PROGRESS",
+      status: { in: ["CREATED", "IN_PROGRESS"] },
     },
     select: { id: true },
   });

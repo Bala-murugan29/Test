@@ -51,8 +51,9 @@ export default function StudentDashboard() {
   const avgScore = results.length > 0
     ? Math.round(results.reduce((sum, r) => sum + r.percentage, 0) / results.length)
     : 0;
-  const bestRank = results.length > 0
-    ? Math.min(...results.filter((r) => r.rank !== undefined).map((r) => r.rank ?? 999))
+  const rankedResults = results.filter((r) => r.rank !== undefined);
+  const bestRank = rankedResults.length > 0
+    ? Math.min(...rankedResults.map((r) => r.rank ?? 999))
     : null;
 
   return (

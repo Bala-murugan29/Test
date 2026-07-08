@@ -8,40 +8,63 @@ import { PassRateDonutChart } from '@/components/charts/PassRateDonutChart';
 import { Button } from '@/components/ui/button';
 import { resultService } from '@/services/result.service';
 import { examService } from '@/services/exam.service';
+import { useAuth } from '@/hooks/useAuth';
 import type { ExamResult, Exam, Question } from '@/types';
 import { formatDateTime, formatDuration, formatScore } from '@/utils/format';
 
 export default function ResultScreen() {
   const { examId } = useParams<{ examId: string }>();
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
   const [result, setResult] = useState<ExamResult | null>(null);
   const [exam, setExam] = useState<Exam | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    if (!examId) return;
+    if (!examId || !user) return;
     const load = async () => {
       try {
         const [allResults, e] = await Promise.all([
-          resultService.getStudentResults('s001'),
+          resultService.getStudentResults(user.id),
           examService.getExamById(examId),
         ]);
-        const r = allResults.find((x) => x.examId === examId) ?? allResults[0];
-        setResult(r ?? null);
+        const r = allResults.find((x) => x.examId === examId) ?? allResults[0] ?? null;
+        setResult(r);
         setExam(e);
+        if (!r) setNotFound(true);
       } catch {
-        // API not wired yet
+        setNotFound(true);
       }
       setLoading(false);
     };
     load();
-  }, [examId]);
+  }, [examId, user]);
 
-  if (loading || !result || !exam) {
+  if (loading) {
     return (
       <DashboardLayout breadcrumbs={['Student', 'Result']}>
         <LoadingSpinner className="min-h-[400px]" message="Loading result..." />
+      </DashboardLayout>
+    );
+  }
+
+  if (notFound || !result || !exam) {
+    return (
+      <DashboardLayout breadcrumbs={['Student', 'Result']}>
+        <div className="min-h-[400px] flex flex-col items-center justify-center gap-4">
+          <XCircle className="w-12 h-12 text-muted-foreground" />
+          <div className="text-center">
+            <h2 className="text-lg font-semibold text-foreground">Result Not Found</h2>
+            <p className="text-muted-foreground text-sm mt-1">
+              The result for this exam is not available yet. It may take a moment to process.
+            </p>
+          </div>
+          <Button onClick={() => setLocation('/student/results')} variant="outline">
+            View All Results
+          </Button>
+        </div>
       </DashboardLayout>
     );
   }

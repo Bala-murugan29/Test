@@ -46,19 +46,16 @@ function Router() {
       <Route path="/login/admin" component={AdminLoginPage} />
 
       {/* Student — protected */}
-      <Route path="/student" nest>
-        <StudentLayout />
-      </Route>
+      <Route path="/student"><StudentLayout /></Route>
+      <Route path="/student/*"><StudentLayout /></Route>
 
       {/* Faculty — protected */}
-      <Route path="/faculty" nest>
-        <FacultyLayout />
-      </Route>
+      <Route path="/faculty"><FacultyLayout /></Route>
+      <Route path="/faculty/*"><FacultyLayout /></Route>
 
       {/* Admin — protected */}
-      <Route path="/admin" nest>
-        <AdminLayout />
-      </Route>
+      <Route path="/admin"><AdminLayout /></Route>
+      <Route path="/admin/*"><AdminLayout /></Route>
 
       <Route component={NotFound} />
     </Switch>

@@ -1,6 +1,128 @@
 import type { FastifyInstance } from "fastify";
 import * as sessionsRepo from "./sessions.repository";
 import { HttpError } from "../../shared/errors/http-error";
+import { spawn } from "node:child_process";
+import fs from "node:fs/promises";
+import path from "node:path";
+import os from "node:os";
+
+interface RunResult {
+  stdout: string;
+  stderr: string;
+  code: number | null;
+}
+
+function runCommand(
+  cmd: string,
+  args: string[],
+  stdin: string,
+  timeoutMs = 5000,
+): Promise<RunResult> {
+  return new Promise((resolve) => {
+    const child = spawn(cmd, args);
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => child.kill("SIGKILL"), timeoutMs);
+    child.stdout.on("data", (d: Buffer) => (stdout += d.toString()));
+    child.stderr.on("data", (d: Buffer) => (stderr += d.toString()));
+    child.on("close", (code, signal) => {
+      clearTimeout(timer);
+      resolve({ stdout, stderr: signal === "SIGKILL" ? "Time Limit Exceeded" : stderr, code });
+    });
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      resolve({ stdout, stderr: err.message, code: -1 });
+    });
+    try {
+      const data = stdin.length > 0 && !stdin.endsWith("\n") ? stdin + "\n" : stdin;
+      child.stdin.write(data);
+      child.stdin.end();
+    } catch {}
+  });
+}
+
+interface TestCase {
+  input: string;
+  expectedOutput: string;
+}
+
+async function gradeCodingAnswer(
+  sourceCode: string,
+  language: string,
+  testCases: TestCase[],
+): Promise<{ passed: number; total: number; allPassed: boolean }> {
+  const isWin = process.platform === "win32";
+  const runDir = path.join(os.tmpdir(), `exam-grade-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  let passed = 0;
+  const total = testCases.length;
+
+  try {
+    await fs.mkdir(runDir, { recursive: true });
+    const lang = language.toLowerCase();
+
+    let compileCmd = "";
+    let compileArgs: string[] = [];
+    let runCmd = "";
+    let runArgs: string[] = [];
+    let sourceFile = "";
+
+    if (lang === "c") {
+      sourceFile = path.join(runDir, "solution.c");
+      const bin = path.join(runDir, isWin ? "solution.exe" : "solution");
+      await fs.writeFile(sourceFile, sourceCode);
+      compileCmd = "gcc";
+      compileArgs = ["-O2", sourceFile, "-o", bin];
+      runCmd = bin;
+      runArgs = [];
+    } else if (lang === "cpp") {
+      sourceFile = path.join(runDir, "solution.cpp");
+      const bin = path.join(runDir, isWin ? "solution.exe" : "solution");
+      await fs.writeFile(sourceFile, sourceCode);
+      compileCmd = "g++";
+      compileArgs = ["-O2", "-std=c++17", sourceFile, "-o", bin];
+      runCmd = bin;
+      runArgs = [];
+    } else if (lang === "python" || lang === "py") {
+      sourceFile = path.join(runDir, "solution.py");
+      await fs.writeFile(sourceFile, sourceCode);
+      runCmd = isWin ? "python" : "python3";
+      runArgs = [sourceFile];
+    } else if (lang === "java") {
+      sourceFile = path.join(runDir, "Main.java");
+      await fs.writeFile(sourceFile, sourceCode);
+      compileCmd = "javac";
+      compileArgs = [sourceFile];
+      runCmd = "java";
+      runArgs = ["-cp", runDir, "Main"];
+    } else {
+      return { passed: 0, total, allPassed: false };
+    }
+
+    // Compile if needed
+    if (compileCmd) {
+      const compile = await runCommand(compileCmd, compileArgs, "", 10000);
+      if (compile.code !== 0) {
+        return { passed: 0, total, allPassed: false };
+      }
+    }
+
+    // Run against each test case
+    for (const tc of testCases) {
+      const result = await runCommand(runCmd, runArgs, tc.input ?? "", 5000);
+      const actual = (result.stdout ?? "").trim();
+      const expected = (tc.expectedOutput ?? "").trim();
+      if (result.code === 0 && actual === expected) {
+        passed++;
+      }
+    }
+  } catch {
+    // grading failure — treat as 0 passed
+  } finally {
+    try { await fs.rm(runDir, { recursive: true, force: true }); } catch {}
+  }
+
+  return { passed, total, allPassed: passed === total && total > 0 };
+}
 
 export async function startSession(
   app: FastifyInstance,
@@ -12,12 +134,23 @@ export async function startSession(
     throw new HttpError(404, "Exam not found");
   }
 
-  if (exam.status !== "ACTIVE") {
-    throw new HttpError(400, "Exam is not currently active");
+  const now = new Date();
+  const startsAt = exam.startsAt ? new Date(exam.startsAt) : null;
+  const endsAt = exam.endsAt ? new Date(exam.endsAt) : null;
+
+  // Check if exam has already ended
+  if (endsAt && endsAt <= now) {
+    throw new HttpError(400, "Exam has already ended");
   }
 
-  if (exam.endsAt && new Date(exam.endsAt) < new Date()) {
-    throw new HttpError(400, "Exam has already ended");
+  // Check if exam has not yet started
+  if (startsAt && startsAt > now) {
+    throw new HttpError(400, "Exam has not started yet");
+  }
+
+  // Only ACTIVE or SCHEDULED exams can be joined
+  if (exam.status !== "ACTIVE" && exam.status !== "SCHEDULED") {
+    throw new HttpError(400, "Exam is not currently active");
   }
 
   const existingSession = await sessionsRepo.findSessionByExamAndStudent(
@@ -57,6 +190,11 @@ export async function startSession(
   }
 
   const expiresAt = new Date(Date.now() + exam.durationMinutes * 60 * 1000);
+
+  // Cap session expiration at exam end time so the exam closes at endsAt
+  if (exam.endsAt && expiresAt > new Date(exam.endsAt)) {
+    expiresAt.setTime(new Date(exam.endsAt).getTime());
+  }
 
   const session = await sessionsRepo.createSession(
     app,
@@ -205,26 +343,40 @@ export async function submitSession(app: FastifyInstance, sessionId: string) {
     throw new HttpError(400, "Session has expired and was auto-submitted");
   }
 
-  // Auto-grade MCQ answers before marking as submitted.
+  // Auto-grade answers before marking as submitted.
   const answers = session.answers ?? [];
   for (const answer of answers) {
     const question = await app.prisma.question.findUnique({
       where: { id: answer.questionId },
-      include: { mcq: true },
+      include: { mcq: true, coding: true },
     });
+    const examQuestion = await app.prisma.examQuestion.findFirst({
+      where: { examId: session.examId, questionId: answer.questionId },
+    });
+    const marks = examQuestion?.marksOverride ?? question?.marks ?? 0;
+
+    // MCQ grading
     if (question?.mcq && answer.selectedOptionIndex !== null && answer.selectedOptionIndex !== undefined) {
       const isCorrect = answer.selectedOptionIndex === question.mcq.correctOptionIndex;
-      const examQuestion = await app.prisma.examQuestion.findFirst({
-        where: { examId: session.examId, questionId: answer.questionId },
-      });
-      const marks = examQuestion?.marksOverride ?? question.marks;
       await app.prisma.studentAnswer.update({
         where: { id: answer.id },
-        data: {
-          isCorrect,
-          marksAwarded: isCorrect ? marks : 0,
-        },
+        data: { isCorrect, marksAwarded: isCorrect ? marks : 0 },
       });
+    }
+
+    // Coding question grading — run source code against test cases
+    if (question?.coding && answer.codeAnswer) {
+      const testCases = (question.coding.testCases ?? []) as unknown as TestCase[];
+      const lang = question.coding.languageConstraints
+        ? ((question.coding.languageConstraints as string[])[0] ?? "python")
+        : "python";
+      if (testCases.length > 0 && answer.codeAnswer.trim()) {
+        const { allPassed } = await gradeCodingAnswer(answer.codeAnswer, lang, testCases);
+        await app.prisma.studentAnswer.update({
+          where: { id: answer.id },
+          data: { isCorrect: allPassed, marksAwarded: allPassed ? marks : 0 },
+        });
+      }
     }
   }
 

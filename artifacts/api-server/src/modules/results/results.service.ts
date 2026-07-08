@@ -5,6 +5,8 @@ import type { PaginationQuery, EvaluateResultBody } from "./results.schemas";
 import { HttpError } from "../../shared/errors/http-error";
 
 type SessionWithExam = {
+  examId: string;
+  attemptNo: number;
   exam: { id: string; title: string; passMarks: number; totalMarks: number } | null;
   student: { userId: string; studentNumber: string } | null;
 };
@@ -37,6 +39,11 @@ function formatResult(r: ResultWithSession) {
     breakdown: r.breakdown,
     evaluatedAt: r.evaluatedAt.toISOString(),
     createdAt: r.createdAt.toISOString(),
+    session: r.session ? {
+      examId: r.session.examId,
+      attemptNo: r.session.attemptNo,
+      exam: r.session.exam ? { title: r.session.exam.title } : null,
+    } : null,
   };
 }
 

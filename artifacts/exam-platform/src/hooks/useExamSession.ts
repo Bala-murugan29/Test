@@ -2,12 +2,14 @@ import { useExamSessionStore } from '../store/exam-session.store';
 
 export function useExamSession() {
   const examId = useExamSessionStore((s) => s.examId);
+  const sessionId = useExamSessionStore((s) => s.sessionId);
   const currentQuestionIndex = useExamSessionStore((s) => s.currentQuestionIndex);
   const answers = useExamSessionStore((s) => s.answers);
   const flaggedQuestions = useExamSessionStore((s) => s.flaggedQuestions);
   const timeRemainingSeconds = useExamSessionStore((s) => s.timeRemainingSeconds);
   const isSubmitted = useExamSessionStore((s) => s.isSubmitted);
   const startSession = useExamSessionStore((s) => s.startSession);
+  const setSessionId = useExamSessionStore((s) => s.setSessionId);
   const answerQuestion = useExamSessionStore((s) => s.answerQuestion);
   const toggleFlag = useExamSessionStore((s) => s.toggleFlag);
   const navigateToQuestion = useExamSessionStore((s) => s.navigateToQuestion);
@@ -20,6 +22,7 @@ export function useExamSession() {
 
   return {
     examId,
+    sessionId,
     currentQuestionIndex,
     answers,
     flaggedQuestions,
@@ -28,6 +31,7 @@ export function useExamSession() {
     answeredCount,
     flaggedCount,
     startSession,
+    setSessionId,
     answerQuestion,
     toggleFlag,
     navigateToQuestion,

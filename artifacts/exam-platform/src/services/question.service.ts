@@ -76,8 +76,10 @@ export const questionService = {
     prompt: string;
     difficulty: number;
     marks: number;
-    testCases: { input: string; expectedOutput: string }[];
+    testCases: { input: string; expectedOutput: string; isHidden?: boolean }[];
     starterCode?: string;
+    sampleInput?: string;
+    sampleOutput?: string;
   }): Promise<BackendQuestion> {
     return apiPost<BackendQuestion>('/questions/coding', data);
   },

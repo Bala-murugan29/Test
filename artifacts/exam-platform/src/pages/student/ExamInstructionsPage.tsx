@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useLocation } from 'wouter';
-import { CheckCircle2, Clock, FileText, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, Clock, FileText, AlertTriangle, Loader2 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/common/PageHeader';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { examService } from '@/services/exam.service';
 import { useExamSession } from '@/hooks/useExamSession';
+import { apiPost } from '@/lib/axios';
 import { Exam } from '@/types';
 import { formatDuration } from '@/utils/format';
 
@@ -16,8 +17,10 @@ export default function ExamInstructionsPage() {
   const [, setLocation] = useLocation();
   const [exam, setExam] = useState<Exam | null>(null);
   const [loading, setLoading] = useState(true);
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
   const [agreed, setAgreed] = useState(false);
-  const { startSession } = useExamSession();
+  const { startSession, setSessionId } = useExamSession();
 
   useEffect(() => {
     if (!examId) return;
@@ -27,10 +30,26 @@ export default function ExamInstructionsPage() {
     });
   }, [examId]);
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (!exam || !agreed) return;
-    startSession(exam.id, exam.durationMinutes);
-    setLocation(`/student/exams/${exam.id}/code`);
+    setStarting(true);
+    setStartError(null);
+    try {
+      // Create (or resume) the backend exam session first.
+      const session = await apiPost<{ id: string }>('/sessions', { examId: exam.id });
+      // Initialise the local timer/answer store and persist the backend session ID.
+      startSession(exam.id, exam.durationMinutes, session.id);
+      setSessionId(session.id);
+      setLocation(`/student/exams/${exam.id}/code`);
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Failed to start exam. Please try again.';
+      setStartError(msg);
+      setStarting(false);
+    }
   };
 
   if (loading || !exam) {
@@ -83,7 +102,7 @@ export default function ExamInstructionsPage() {
         </div>
 
         {/* Agree checkbox */}
-        <div className="flex items-start gap-3 mb-6">
+        <div className="flex items-start gap-3 mb-4">
           <Checkbox
             id="agree"
             checked={agreed}
@@ -95,12 +114,20 @@ export default function ExamInstructionsPage() {
           </label>
         </div>
 
+        {/* Session creation error */}
+        {startError && (
+          <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 mb-4 text-sm text-red-700 dark:text-red-400">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{startError}</span>
+          </div>
+        )}
+
         <div className="flex gap-3">
-          <Button variant="outline" onClick={() => history.back()} data-testid="button-back">
+          <Button variant="outline" onClick={() => history.back()} disabled={starting} data-testid="button-back">
             Go Back
           </Button>
-          <Button onClick={handleStart} disabled={!agreed} className="flex-1" data-testid="button-start-exam">
-            Start Exam
+          <Button onClick={handleStart} disabled={!agreed || starting} className="flex-1" data-testid="button-start-exam">
+            {starting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Starting...</> : 'Start Exam'}
           </Button>
         </div>
       </div>

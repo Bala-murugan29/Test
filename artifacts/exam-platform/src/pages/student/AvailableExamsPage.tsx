@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { BookOpen } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -24,13 +24,37 @@ export default function AvailableExamsPage() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 300);
 
+  const fetchExams = useCallback(
+    async (showLoading = false) => {
+      if (!user) return;
+      if (showLoading) setLoading(true);
+      try {
+        const e = await examService.getStudentExams(user.id);
+        setExams(e);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [user],
+  );
+
   useEffect(() => {
-    if (!user) return;
-    examService.getStudentExams(user.id).then((e) => {
-      setExams(e);
-      setLoading(false);
-    });
-  }, [user]);
+    fetchExams(true);
+
+    // Auto-refresh every 60 s so Upcoming→Live transitions happen automatically.
+    const interval = setInterval(() => fetchExams(false), 60_000);
+
+    // Also refresh when the tab regains focus (student returns after taking an exam).
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') fetchExams(false);
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [fetchExams]);
 
   const filterExams = (list: StudentExam[]) =>
     list.filter(
@@ -42,6 +66,7 @@ export default function AvailableExamsPage() {
   const upcoming = filterExams(exams.filter((e) => e.status === 'published'));
   const ongoing = filterExams(exams.filter((e) => e.status === 'ongoing'));
   const completed = filterExams(exams.filter((e) => e.status === 'completed'));
+  const missed = filterExams(exams.filter((e) => e.status === 'missed'));
   const all = filterExams(exams);
 
   return (
@@ -61,21 +86,29 @@ export default function AvailableExamsPage() {
             <TabsTrigger value="ongoing">Live ({ongoing.length})</TabsTrigger>
             <TabsTrigger value="upcoming">Upcoming ({upcoming.length})</TabsTrigger>
             <TabsTrigger value="completed">Completed ({completed.length})</TabsTrigger>
+            <TabsTrigger value="missed">Missed ({missed.length})</TabsTrigger>
           </TabsList>
           {[
             { key: 'all', list: all },
             { key: 'ongoing', list: ongoing },
             { key: 'upcoming', list: upcoming },
             { key: 'completed', list: completed },
+            { key: 'missed', list: missed },
           ].map(({ key, list }) => (
             <TabsContent key={key} value={key} className="mt-4">
               {list.length === 0 ? (
                 <EmptyState title="No exams found" description="Try adjusting your search." icon={<BookOpen className="w-7 h-7" />} />
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {list.map((exam) => (
-                    <ExamCard key={exam.id} exam={exam} onView={() => setLocation(`/student/exams/${exam.id}/instructions`)} />
-                  ))}
+                  {list.map((exam) => {
+                    const destination =
+                      exam.status === 'completed'
+                        ? `/student/exams/${exam.id}/result`
+                        : `/student/exams/${exam.id}/instructions`;
+                    return (
+                      <ExamCard key={exam.id} exam={exam} onView={() => setLocation(destination)} />
+                    );
+                  })}
                 </div>
               )}
             </TabsContent>
@@ -116,14 +149,21 @@ function ExamCard({ exam, onView }: { exam: StudentExam; onView: () => void }) {
         </div>
       )}
 
+      {exam.status === 'missed' && (
+        <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 font-medium">
+          You did not attend this exam.
+        </div>
+      )}
+
       <Button
         size="sm"
         variant={exam.status === 'ongoing' ? 'default' : 'outline'}
         onClick={onView}
         className="w-full"
         data-testid={`button-view-exam-${exam.id}`}
+        disabled={exam.status === 'missed'}
       >
-        {exam.status === 'ongoing' ? 'Enter Exam' : exam.status === 'completed' ? 'View Result' : 'View Details'}
+        {exam.status === 'ongoing' ? 'Enter Exam' : exam.status === 'completed' ? 'View Result' : exam.status === 'missed' ? 'Unattended' : 'View Details'}
       </Button>
     </div>
   );

@@ -27,7 +27,10 @@ export async function findExams(
   const [exams, total] = await Promise.all([
     app.prisma.exam.findMany({
       where,
-      include: { course: { select: { id: true, title: true } } },
+      include: {
+        course: { select: { id: true, title: true } },
+        _count: { select: { questions: true } },
+      },
       skip,
       take: limit,
       orderBy: { createdAt: "desc" },
@@ -54,6 +57,7 @@ export async function findExams(
       createdAt: Date;
       updatedAt: Date;
       course: { id: string; title: string } | null;
+      _count: { questions: number };
     }) => ({
       id: e.id,
       courseId: e.courseId,
@@ -70,6 +74,7 @@ export async function findExams(
       allowReview: e.allowReview,
       attemptLimit: e.attemptLimit,
       publishedAt: e.publishedAt?.toISOString() ?? null,
+      questionCount: e._count.questions,
       createdAt: e.createdAt.toISOString(),
       updatedAt: e.updatedAt.toISOString(),
     })),
@@ -87,6 +92,7 @@ export async function findExamById(app: FastifyInstance, id: string) {
     where: { id },
     include: {
       course: { select: { id: true, title: true } },
+      _count: { select: { questions: true } },
       questions: {
         orderBy: { sequenceNo: "asc" },
         select: {
@@ -121,7 +127,7 @@ export async function createExam(
       allowReview: data.allowReview,
       attemptLimit: data.attemptLimit,
     },
-    include: { course: { select: { id: true, title: true } } },
+    include: { course: { select: { id: true, title: true } }, _count: { select: { questions: true } } },
   });
 }
 
@@ -137,7 +143,7 @@ export async function updateExam(
       startsAt: data.startsAt ? new Date(data.startsAt) : undefined,
       endsAt: data.endsAt ? new Date(data.endsAt) : undefined,
     },
-    include: { course: { select: { id: true, title: true } } },
+    include: { course: { select: { id: true, title: true } }, _count: { select: { questions: true } } },
   });
 }
 
@@ -152,7 +158,7 @@ export async function updateExamStatus(
       status: status as "DRAFT" | "SCHEDULED" | "ACTIVE" | "ENDED" | "ARCHIVED",
       ...(status === "SCHEDULED" ? { publishedAt: new Date() } : {}),
     },
-    include: { course: { select: { id: true, title: true } } },
+    include: { course: { select: { id: true, title: true } }, _count: { select: { questions: true } } },
   });
 }
 

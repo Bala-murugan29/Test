@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useLocation } from 'wouter';
+import { useState, useEffect } from 'react';
+import { useLocation, useParams } from 'wouter';
 import { Plus, Trash2, ChevronRight, ChevronLeft, Check } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -11,6 +11,7 @@ import { examService } from '@/services/exam.service';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/utils/cn';
 import { formatDateTime } from '@/utils/format';
+import type { Exam } from '@/types';
 
 interface Step1Data {
   title: string;
@@ -36,6 +37,9 @@ const STEPS = ['Basic Info', 'Settings', 'Review & Publish'];
 export default function CreateExamPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const { examId } = useParams<{ examId?: string }>();
+  const isEdit = !!examId;
+
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [newInstruction, setNewInstruction] = useState('');
@@ -60,6 +64,42 @@ export default function CreateExamPage() {
     ],
   });
 
+  useEffect(() => {
+    if (!examId) return;
+    examService.getExamById(examId).then((e) => {
+      if (e) {
+        setStep1({
+          title: e.title,
+          subject: e.subject,
+          department: e.department || DEPARTMENTS[0],
+          durationMinutes: String(e.durationMinutes),
+          totalQuestions: String(e.totalQuestions),
+          totalMarks: String(e.totalMarks),
+          passingMarks: String(e.passingMarks),
+        });
+
+        const formatToLocalDatetime = (isoStr: string) => {
+          if (!isoStr) return '';
+          const d = new Date(isoStr);
+          if (isNaN(d.getTime())) return '';
+          const offsetMs = d.getTimezoneOffset() * 60 * 1000;
+          const localTime = new Date(d.getTime() - offsetMs);
+          return localTime.toISOString().slice(0, 16);
+        };
+
+        setStep2({
+          scheduledAt: formatToLocalDatetime(e.scheduledAt),
+          endsAt: formatToLocalDatetime(e.endsAt),
+          allowedAttempts: String(e.allowedAttempts),
+          instructions: e.instructions && e.instructions.length > 0 ? e.instructions : [
+            'Read each question carefully before answering.',
+            'Do not close the browser tab during the examination.',
+          ],
+        });
+      }
+    });
+  }, [examId]);
+
   const addInstruction = () => {
     if (!newInstruction.trim()) return;
     setStep2((s) => ({ ...s, instructions: [...s.instructions, newInstruction.trim()] }));
@@ -73,7 +113,16 @@ export default function CreateExamPage() {
   const handlePublish = async (status: 'draft' | 'published') => {
     if (!user) return;
     setSaving(true);
-    await examService.createExam({
+    const formatToISO = (val: string) => {
+      if (!val) return new Date().toISOString();
+      try {
+        return new Date(val).toISOString();
+      } catch {
+        return new Date().toISOString();
+      }
+    };
+
+    const examData: Partial<Exam> = {
       title: step1.title,
       subject: step1.subject,
       department: step1.department,
@@ -83,20 +132,29 @@ export default function CreateExamPage() {
       totalQuestions: Number(step1.totalQuestions),
       totalMarks: Number(step1.totalMarks),
       passingMarks: Number(step1.passingMarks),
-      scheduledAt: step2.scheduledAt || new Date().toISOString(),
-      endsAt: step2.endsAt || new Date().toISOString(),
+      scheduledAt: formatToISO(step2.scheduledAt),
+      endsAt: formatToISO(step2.endsAt),
       allowedAttempts: Number(step2.allowedAttempts),
       instructions: step2.instructions,
       status,
-    });
+    };
+
+    if (isEdit && examId) {
+      await examService.updateExam(examId, examData);
+    } else {
+      await examService.createExam(examData);
+    }
     setSaving(false);
-    setLocation('/faculty/dashboard');
+    setLocation('/faculty/exams/list');
   };
 
   return (
-    <DashboardLayout breadcrumbs={['Faculty', 'Exams', 'Create']}>
+    <DashboardLayout breadcrumbs={['Faculty', 'Exams', isEdit ? 'Edit' : 'Create']}>
       <div className="max-w-2xl mx-auto">
-        <PageHeader title="Create Exam" subtitle="Set up a new examination for your students" />
+        <PageHeader
+          title={isEdit ? 'Edit Exam' : 'Create Exam'}
+          subtitle={isEdit ? 'Update exam settings and parameters' : 'Set up a new examination for your students'}
+        />
 
         {/* Stepper */}
         <div className="flex items-center mb-8">

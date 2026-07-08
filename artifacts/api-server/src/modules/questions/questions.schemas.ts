@@ -32,6 +32,7 @@ const createMcqQuestionBodySchema = z.object({
 const testCaseSchema = z.object({
   input: z.string(),
   expectedOutput: z.string(),
+  isHidden: z.boolean().optional(),
 });
 
 const createCodingQuestionBodySchema = z.object({
@@ -93,7 +94,13 @@ const questionResponseSchema = z.object({
     .object({
       starterCode: z.string().nullable().optional(),
       solutionTemplate: z.string().nullable().optional(),
-      testCases: z.array(z.object({ input: z.string(), expectedOutput: z.string() })),
+      testCases: z.array(
+        z.object({
+          input: z.string(),
+          expectedOutput: z.string(),
+          isHidden: z.boolean().optional(),
+        })
+      ),
       languageConstraints: z.array(z.string()).nullable().optional(),
       sampleInput: z.string().nullable().optional(),
       sampleOutput: z.string().nullable().optional(),

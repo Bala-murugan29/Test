@@ -43,6 +43,7 @@ export interface TestRunResult {
   passed: boolean;
   runtime?: string;
   isHidden?: boolean;
+  stderr?: string;
 }
 
 export interface CodeSubmission {

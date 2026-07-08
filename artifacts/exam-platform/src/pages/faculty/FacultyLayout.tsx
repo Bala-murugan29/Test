@@ -11,37 +11,42 @@ import AnalyticsDashboard from './AnalyticsDashboard';
 export default function FacultyLayout() {
   return (
     <Switch>
-      <Route path="/faculty/dashboard" nest>
+      <Route path="/faculty/dashboard">
         <ProtectedRoute allowedRoles={['faculty']}>
           <FacultyDashboard />
         </ProtectedRoute>
       </Route>
-      <Route path="/faculty/exams/list" nest>
+      <Route path="/faculty/exams/list">
         <ProtectedRoute allowedRoles={['faculty']}>
           <FacultyExamListPage />
         </ProtectedRoute>
       </Route>
-      <Route path="/faculty/exams/create" nest>
+      <Route path="/faculty/exams/create">
         <ProtectedRoute allowedRoles={['faculty']}>
           <CreateExamPage />
         </ProtectedRoute>
       </Route>
-      <Route path="/faculty/exams/:examId/questions" nest>
+      <Route path="/faculty/exams/:examId/edit">
+        <ProtectedRoute allowedRoles={['faculty']}>
+          <CreateExamPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/faculty/exams/:examId/questions">
         <ProtectedRoute allowedRoles={['faculty']}>
           <QuestionBankPage />
         </ProtectedRoute>
       </Route>
-      <Route path="/faculty/students" nest>
+      <Route path="/faculty/students">
         <ProtectedRoute allowedRoles={['faculty']}>
           <StudentManagementPage />
         </ProtectedRoute>
       </Route>
-      <Route path="/faculty/reports" nest>
+      <Route path="/faculty/reports">
         <ProtectedRoute allowedRoles={['faculty']}>
           <ReportsPage />
         </ProtectedRoute>
       </Route>
-      <Route path="/faculty/analytics" nest>
+      <Route path="/faculty/analytics">
         <ProtectedRoute allowedRoles={['faculty']}>
           <AnalyticsDashboard />
         </ProtectedRoute>

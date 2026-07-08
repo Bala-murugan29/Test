@@ -24,6 +24,21 @@ const resultResponseSchema = {
     breakdown: { type: "object", nullable: true },
     evaluatedAt: { type: "string" },
     createdAt: { type: "string" },
+    session: {
+      type: "object",
+      nullable: true,
+      properties: {
+        examId: { type: "string" },
+        attemptNo: { type: "integer" },
+        exam: {
+          type: "object",
+          nullable: true,
+          properties: {
+            title: { type: "string" },
+          },
+        },
+      },
+    },
   },
 };
 

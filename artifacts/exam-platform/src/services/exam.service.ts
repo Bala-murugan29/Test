@@ -1,5 +1,6 @@
 import { apiGet, apiPost, apiPut } from '@/lib/axios';
-import type { Exam, StudentExam, Question } from '@/types';
+import type { Exam, StudentExam, Question, ExamResult } from '@/types';
+import { resultService } from './result.service';
 
 /* ---------- backend shapes ---------- */
 
@@ -27,6 +28,7 @@ interface BackendExamListItem {
   allowReview: boolean;
   attemptLimit: number;
   publishedAt: string | null;
+  questionCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -80,8 +82,57 @@ const STATUS_MAP: Record<string, Exam['status']> = {
   ARCHIVED: 'cancelled',
 };
 
+/**
+ * Derive the real-time status from timestamps.
+ *
+ * The backend status is set explicitly (publish/archive actions) and does NOT
+ * auto-transition by time. So a `SCHEDULED` exam whose `startsAt` has already
+ * passed still shows as "Upcoming" from the backend alone.
+ *
+ * Priority:
+ *  1. DRAFT / ARCHIVED / ENDED — trust the backend; these are terminal or explicit.
+ *  2. SCHEDULED or ACTIVE — override with time-window logic:
+ *       • before startsAt          → upcoming (published)
+ *       • startsAt passed, endsAt not yet → ongoing
+ *       • endsAt passed            → completed
+ */
+function deriveStatus(e: BackendExamListItem): Exam['status'] {
+  const backendStatus = STATUS_MAP[e.status] ?? 'draft';
+
+  // Trust terminal / explicit states.
+  if (backendStatus === 'draft' || backendStatus === 'cancelled' || backendStatus === 'completed') {
+    return backendStatus;
+  }
+
+  const now = Date.now();
+  const startsAt = e.startsAt ? new Date(e.startsAt).getTime() : null;
+  // Compute endsAt from startsAt + duration if not explicitly set.
+  const endsAt = e.endsAt
+    ? new Date(e.endsAt).getTime()
+    : startsAt
+      ? startsAt + e.durationMinutes * 60_000
+      : null;
+
+  // Exam ended (endsAt passed)
+  if (endsAt && now > endsAt) {
+    return 'completed';
+  }
+
+  // No explicit startsAt → published exam is immediately open (ongoing) until endsAt.
+  if (!startsAt) {
+    return 'ongoing';
+  }
+
+  // startsAt set and has passed → ongoing (still within window, endsAt check above passed)
+  if (now >= startsAt) {
+    return 'ongoing';
+  }
+
+  // Still before start
+  return 'published';
+}
+
 function mapExam(e: BackendExamListItem | BackendExamDetail): Exam {
-  const detail = 'questions' in e ? e : null;
   return {
     id: e.id,
     title: e.title,
@@ -92,8 +143,8 @@ function mapExam(e: BackendExamListItem | BackendExamDetail): Exam {
     totalMarks: e.totalMarks,
     passingMarks: e.passMarks,
     durationMinutes: e.durationMinutes,
-    totalQuestions: detail ? detail.questions.length : 0,
-    status: STATUS_MAP[e.status] ?? 'draft',
+    totalQuestions: e.questionCount ?? 0,
+    status: deriveStatus(e),
     scheduledAt: e.startsAt ?? '',
     endsAt: e.endsAt ?? '',
     instructions: e.instructions ? [e.instructions] : [],
@@ -106,11 +157,19 @@ function mapQuestion(q: BackendQuestion, examId: string): Question {
     id: q.id,
     examId,
     text: q.prompt,
-    type: q.type === 'MCQ' ? 'mcq' : 'mcq',
+    type: q.type === 'MCQ' ? 'mcq' : q.type === 'CODING' ? 'coding' : 'mcq',
     options: q.mcq?.options.map((o, i) => ({ id: String(i), text: o.text })) ?? [],
     correctOptionId: q.mcq ? String(q.mcq.correctOptionIndex) : '',
     marks: q.marks,
     negativeMarks: 0,
+    coding: q.coding
+      ? {
+          starterCode: q.coding.starterCode ?? undefined,
+          testCases: q.coding.testCases ?? [],
+          sampleInput: q.coding.sampleInput ?? undefined,
+          sampleOutput: q.coding.sampleOutput ?? undefined,
+        }
+      : undefined,
   };
 }
 
@@ -129,19 +188,39 @@ async function fetchAllExams(params?: Record<string, string | number>): Promise<
 /* ---------- public service ---------- */
 
 export const examService = {
-  async getStudentExams(_studentId: string): Promise<StudentExam[]> {
-    const [active, scheduled, ended] = await Promise.all([
-      fetchAllExams({ status: 'ACTIVE' }).catch(() => []),
-      fetchAllExams({ status: 'SCHEDULED' }).catch(() => []),
-      fetchAllExams({ status: 'ENDED' }).catch(() => []),
+  async getStudentExams(studentId: string): Promise<StudentExam[]> {
+    const [active, scheduled, ended, results] = await Promise.all([
+      fetchAllExams({ status: 'ACTIVE' }).catch(() => [] as BackendExamListItem[]),
+      fetchAllExams({ status: 'SCHEDULED' }).catch(() => [] as BackendExamListItem[]),
+      fetchAllExams({ status: 'ENDED' }).catch(() => [] as BackendExamListItem[]),
+      resultService.getStudentResults(studentId).catch(() => [] as ExamResult[]),
     ]);
     const allExams = [...active, ...scheduled, ...ended];
-    return allExams.map((e) => ({
-      ...mapExam(e),
-      attemptsMade: 0,
-      lastScore: undefined,
-      isPassed: undefined,
-    }));
+
+    // Filter out duplicates (just in case they appear in multiple backend statuses)
+    const uniqueExamsMap = new Map<string, BackendExamListItem>();
+    allExams.forEach((e) => uniqueExamsMap.set(e.id, e));
+    const uniqueExams = Array.from(uniqueExamsMap.values());
+
+    return uniqueExams.map((e) => {
+      const exam = mapExam(e);
+      const userResult = results.find((r) => r.examId === exam.id);
+
+      // Derive if it's missed/unattended or completed
+      if (exam.status === 'completed' && !userResult) {
+        exam.status = 'missed';
+      } else if (userResult) {
+        // If the user has a result, from their perspective this exam is completed
+        exam.status = 'completed';
+      }
+
+      return {
+        ...exam,
+        attemptsMade: userResult ? 1 : 0,
+        lastScore: userResult?.percentage,
+        isPassed: userResult?.isPassed,
+      };
+    });
   },
 
   async getExamById(examId: string): Promise<Exam | null> {
@@ -181,14 +260,19 @@ export const examService = {
       const depts = await apiGet<Paginated<{ id: string }>>('/departments', { params: { page: 1, limit: 1 } });
       if (depts.data.length > 0) {
         const deptId = depts.data[0].id;
+        const cleanSubject = data.subject && data.subject.trim().length > 0 ? data.subject.trim() : 'EXAM101';
+        const targetCode = cleanSubject.slice(0, 10).toUpperCase();
         try {
-          const courses = await apiGet<Paginated<{ id: string }>>(`/departments/${deptId}/courses`);
-          if (courses.data.length > 0) courseId = courses.data[0].id;
-        } catch { /* no courses */ }
+          const courses = await apiGet<Array<{ id: string; code: string }>>(`/departments/${deptId}/courses`);
+          const existing = courses.find((c) => c.code.toUpperCase() === targetCode);
+          if (existing) {
+            courseId = existing.id;
+          }
+        } catch { /* no courses / query failed */ }
         if (!courseId) {
           const course = await apiPost<{ id: string }>(`/departments/${deptId}/courses`, {
-            code: data.subject?.slice(0, 10) ?? 'EXAM101',
-            title: data.subject ?? 'General',
+            code: targetCode,
+            title: data.subject && data.subject.trim().length > 0 ? data.subject.trim() : 'General',
             credits: 3,
           });
           courseId = course.id;

@@ -24,6 +24,7 @@ function formatExam(exam: {
   createdAt: Date;
   updatedAt: Date;
   course: ExamCourse;
+  _count?: { questions: number };
 }) {
   return {
     id: exam.id,
@@ -41,6 +42,7 @@ function formatExam(exam: {
     allowReview: exam.allowReview,
     attemptLimit: exam.attemptLimit,
     publishedAt: exam.publishedAt?.toISOString() ?? null,
+    questionCount: exam._count?.questions ?? 0,
     createdAt: exam.createdAt.toISOString(),
     updatedAt: exam.updatedAt.toISOString(),
   };
@@ -64,6 +66,7 @@ function formatExamWithQuestions(exam: {
   createdAt: Date;
   updatedAt: Date;
   course: ExamCourse;
+  _count?: { questions: number };
   questions: ExamQuestionEntry[];
 }) {
   return {

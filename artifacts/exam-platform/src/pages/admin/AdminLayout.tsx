@@ -8,22 +8,22 @@ import SettingsPage from './SettingsPage';
 export default function AdminLayout() {
   return (
     <Switch>
-      <Route path="/admin/dashboard" nest>
+      <Route path="/admin/dashboard">
         <ProtectedRoute allowedRoles={['admin']}>
           <AdminDashboard />
         </ProtectedRoute>
       </Route>
-      <Route path="/admin/users" nest>
+      <Route path="/admin/users">
         <ProtectedRoute allowedRoles={['admin']}>
           <UserManagementPage />
         </ProtectedRoute>
       </Route>
-      <Route path="/admin/departments" nest>
+      <Route path="/admin/departments">
         <ProtectedRoute allowedRoles={['admin']}>
           <DepartmentManagementPage />
         </ProtectedRoute>
       </Route>
-      <Route path="/admin/settings" nest>
+      <Route path="/admin/settings">
         <ProtectedRoute allowedRoles={['admin']}>
           <SettingsPage />
         </ProtectedRoute>

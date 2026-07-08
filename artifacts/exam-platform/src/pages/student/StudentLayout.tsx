@@ -12,42 +12,42 @@ import StudentResultsPage from './StudentResultsPage';
 export default function StudentLayout() {
   return (
     <Switch>
-      <Route path="/student/dashboard" nest>
+      <Route path="/student/dashboard">
         <ProtectedRoute allowedRoles={['student']}>
           <StudentDashboard />
         </ProtectedRoute>
       </Route>
-      <Route path="/student/exams" nest>
+      <Route path="/student/exams">
         <ProtectedRoute allowedRoles={['student']}>
           <AvailableExamsPage />
         </ProtectedRoute>
       </Route>
-      <Route path="/student/exams/:examId/instructions" nest>
+      <Route path="/student/exams/:examId/instructions">
         <ProtectedRoute allowedRoles={['student']}>
           <ExamInstructionsPage />
         </ProtectedRoute>
       </Route>
-      <Route path="/student/exams/:examId/take" nest>
+      <Route path="/student/exams/:examId/take">
         <ProtectedRoute allowedRoles={['student']}>
           <ExamScreen />
         </ProtectedRoute>
       </Route>
-      <Route path="/student/exams/:examId/code" nest>
+      <Route path="/student/exams/:examId/code">
         <ProtectedRoute allowedRoles={['student']}>
           <CodingExamScreen />
         </ProtectedRoute>
       </Route>
-      <Route path="/student/exams/:examId/submit" nest>
+      <Route path="/student/exams/:examId/submit">
         <ProtectedRoute allowedRoles={['student']}>
           <SubmitScreen />
         </ProtectedRoute>
       </Route>
-      <Route path="/student/exams/:examId/result" nest>
+      <Route path="/student/exams/:examId/result">
         <ProtectedRoute allowedRoles={['student']}>
           <ResultScreen />
         </ProtectedRoute>
       </Route>
-      <Route path="/student/results" nest>
+      <Route path="/student/results">
         <ProtectedRoute allowedRoles={['student']}>
           <StudentResultsPage />
         </ProtectedRoute>

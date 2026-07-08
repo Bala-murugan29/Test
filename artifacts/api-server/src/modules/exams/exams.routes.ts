@@ -14,7 +14,7 @@ import {
 
 const examResponseSchema = {
   type: "object",
-  required: ["id", "courseId", "title", "durationMinutes", "totalMarks", "passMarks", "status", "randomizeQuestions", "allowReview", "attemptLimit", "createdAt", "updatedAt"],
+  required: ["id", "courseId", "title", "durationMinutes", "totalMarks", "passMarks", "status", "randomizeQuestions", "allowReview", "attemptLimit", "questionCount", "createdAt", "updatedAt"],
   properties: {
     id: { type: "string" },
     courseId: { type: "string" },
@@ -31,6 +31,7 @@ const examResponseSchema = {
     allowReview: { type: "boolean" },
     attemptLimit: { type: "integer" },
     publishedAt: { type: "string", nullable: true },
+    questionCount: { type: "integer" },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },

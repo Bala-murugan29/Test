@@ -22,13 +22,27 @@ export default function FacultyExamListPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'ongoing' | 'published' | 'draft' | 'completed'>('all');
 
-  useEffect(() => {
+  const loadExams = () => {
     if (!user) { setLoading(false); return; }
     examService.getFacultyExams(user.id).then((e) => {
       setExams(e.sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9)));
       setLoading(false);
     });
+  };
+
+  useEffect(() => {
+    loadExams();
   }, [user]);
+
+  const handlePublish = async (examId: string) => {
+    try {
+      await examService.publishExam(examId);
+      loadExams();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to publish exam. Make sure the exam has at least one question.");
+    }
+  };
 
   const filtered = filter === 'all' ? exams : exams.filter((e) => e.status === filter);
 
@@ -83,7 +97,13 @@ export default function FacultyExamListPage() {
       ) : (
         <div className="flex flex-col gap-3">
           {filtered.map((exam) => (
-            <ExamCard key={exam.id} exam={exam} onViewQuestions={() => setLocation(`/faculty/exams/${exam.id}/questions`)} />
+            <ExamCard
+              key={exam.id}
+              exam={exam}
+              onViewQuestions={() => setLocation(`/faculty/exams/${exam.id}/questions`)}
+              onPublish={() => handlePublish(exam.id)}
+              onEdit={() => setLocation(`/faculty/exams/${exam.id}/edit`)}
+            />
           ))}
         </div>
       )}
@@ -91,7 +111,17 @@ export default function FacultyExamListPage() {
   );
 }
 
-function ExamCard({ exam, onViewQuestions }: { exam: Exam; onViewQuestions: () => void }) {
+function ExamCard({
+  exam,
+  onViewQuestions,
+  onPublish,
+  onEdit,
+}: {
+  exam: Exam;
+  onViewQuestions: () => void;
+  onPublish: () => void;
+  onEdit: () => void;
+}) {
   const problemCount = exam.totalQuestions;
 
   return (
@@ -129,6 +159,19 @@ function ExamCard({ exam, onViewQuestions }: { exam: Exam; onViewQuestions: () =
 
       {/* Actions */}
       <div className="flex gap-2 shrink-0">
+        {exam.status === 'draft' && (
+          <Button
+            variant="default"
+            size="sm"
+            onClick={onPublish}
+            disabled={problemCount === 0}
+            title={problemCount === 0 ? "Add at least one question before publishing" : "Publish exam"}
+            data-testid={`button-publish-${exam.id}`}
+            className="flex items-center gap-1.5"
+          >
+            Publish
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"
@@ -141,6 +184,7 @@ function ExamCard({ exam, onViewQuestions }: { exam: Exam; onViewQuestions: () =
         <Button
           variant="ghost"
           size="sm"
+          onClick={onEdit}
           data-testid={`button-edit-${exam.id}`}
           className="flex items-center gap-1.5"
         >

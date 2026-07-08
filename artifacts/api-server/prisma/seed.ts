@@ -196,7 +196,32 @@ async function main() {
     },
   });
 
-  console.log("Admin faculty profile created");
+  // Create FacultyProfile for faculty user
+  await prisma.facultyProfile.upsert({
+    where: { userId: facultyUser.id },
+    update: {},
+    create: {
+      userId: facultyUser.id,
+      departmentId: csDept.id,
+      employeeNumber: "FAC001",
+      designation: "Assistant Professor",
+    },
+  });
+
+  // Create StudentProfile for student user
+  await prisma.studentProfile.upsert({
+    where: { userId: studentUser.id },
+    update: {},
+    create: {
+      userId: studentUser.id,
+      departmentId: csDept.id,
+      studentNumber: "STU001",
+      admissionYear: 2024,
+      currentSemester: 3,
+    },
+  });
+
+  console.log("Profiles created for seeded users");
   console.log("Seeding complete!");
 }
 

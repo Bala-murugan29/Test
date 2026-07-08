@@ -1,5 +1,5 @@
-export type ExamStatus = 'draft' | 'published' | 'ongoing' | 'completed' | 'cancelled';
-export type QuestionType = 'mcq' | 'true_false';
+export type ExamStatus = 'draft' | 'published' | 'ongoing' | 'completed' | 'cancelled' | 'missed';
+export type QuestionType = 'mcq' | 'true_false' | 'coding';
 
 export interface ExamOption {
   id: string;
@@ -15,6 +15,12 @@ export interface Question {
   correctOptionId: string;
   marks: number;
   negativeMarks: number;
+  coding?: {
+    starterCode?: string;
+    testCases: { input: string; expectedOutput: string; isHidden?: boolean }[];
+    sampleInput?: string;
+    sampleOutput?: string;
+  };
 }
 
 export interface Exam {

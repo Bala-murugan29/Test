@@ -49,7 +49,11 @@ export function useAuth() {
           // Refresh failed — clear everything.
         }
       }
-      clearAuth();
+      // Don't clear auth if the user already logged in while getMe was in flight.
+      const currentStatus = useAuthStore.getState().status;
+      if (currentStatus !== 'authenticated') {
+        clearAuth();
+      }
     }
   }, [setUser, setAuth, clearAuth]);
 

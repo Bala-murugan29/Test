@@ -2,12 +2,15 @@ import { create } from 'zustand';
 
 interface ExamSessionState {
   examId: string | null;
+  /** Backend ExamSession ID — set after POST /sessions succeeds. */
+  sessionId: string | null;
   currentQuestionIndex: number;
   answers: Record<string, string>; // questionId -> optionId
   flaggedQuestions: Set<string>;
   timeRemainingSeconds: number;
   isSubmitted: boolean;
-  startSession: (examId: string, durationMinutes: number) => void;
+  startSession: (examId: string, durationMinutes: number, sessionId?: string) => void;
+  setSessionId: (sessionId: string) => void;
   answerQuestion: (questionId: string, optionId: string) => void;
   toggleFlag: (questionId: string) => void;
   navigateToQuestion: (index: number) => void;
@@ -18,20 +21,23 @@ interface ExamSessionState {
 
 export const useExamSessionStore = create<ExamSessionState>((set) => ({
   examId: null,
+  sessionId: null,
   currentQuestionIndex: 0,
   answers: {},
   flaggedQuestions: new Set(),
   timeRemainingSeconds: 0,
   isSubmitted: false,
-  startSession: (examId, durationMinutes) =>
+  startSession: (examId, durationMinutes, sessionId) =>
     set({
       examId,
+      sessionId: sessionId ?? null,
       timeRemainingSeconds: durationMinutes * 60,
       currentQuestionIndex: 0,
       answers: {},
       flaggedQuestions: new Set(),
       isSubmitted: false,
     }),
+  setSessionId: (sessionId) => set({ sessionId }),
   answerQuestion: (questionId, optionId) =>
     set((state) => ({
       answers: { ...state.answers, [questionId]: optionId },
@@ -52,6 +58,7 @@ export const useExamSessionStore = create<ExamSessionState>((set) => ({
   clearSession: () =>
     set({
       examId: null,
+      sessionId: null,
       currentQuestionIndex: 0,
       answers: {},
       flaggedQuestions: new Set(),
