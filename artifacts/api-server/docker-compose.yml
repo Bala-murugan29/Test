@@ -51,6 +51,15 @@ services:
       redis:
         condition: service_healthy
 
+  frontend:
+    build:
+      context: ../..
+      dockerfile: artifacts/exam-platform/Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
 volumes:
   postgres-data:
   redis-data:
