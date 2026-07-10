@@ -138,27 +138,13 @@ async function main() {
 
   // 5. Create demo users
   const hashes = await Promise.all([
-    bcrypt.hash("password123", SALT_ROUNDS),
-    bcrypt.hash("password123", SALT_ROUNDS),
-    bcrypt.hash("password123", SALT_ROUNDS),
+    bcrypt.hash("Balamru29$", SALT_ROUNDS),
   ]);
 
   const adminUser = await prisma.user.upsert({
-    where: { email: "rajesh.kumar@university.edu" },
+    where: { email: "r.balamurugan2910@gmail.com" },
     update: {},
-    create: { email: "rajesh.kumar@university.edu", passwordHash: hashes[0], fullName: "Rajesh Kumar", status: "ACTIVE" },
-  });
-
-  const facultyUser = await prisma.user.upsert({
-    where: { email: "priya.mehta@university.edu" },
-    update: {},
-    create: { email: "priya.mehta@university.edu", passwordHash: hashes[1], fullName: "Dr. Priya Mehta", status: "ACTIVE" },
-  });
-
-  const studentUser = await prisma.user.upsert({
-    where: { email: "arjun.sharma@university.edu" },
-    update: {},
-    create: { email: "arjun.sharma@university.edu", passwordHash: hashes[2], fullName: "Arjun Sharma", status: "ACTIVE" },
+    create: { email: "r.balamurugan2910@gmail.com", passwordHash: hashes[0], fullName: "Balamurugan", status: "ACTIVE" },
   });
 
   console.log("Users created");
@@ -168,18 +154,6 @@ async function main() {
     where: { userId_roleId: { userId: adminUser.id, roleId: adminRole.id } },
     update: {},
     create: { userId: adminUser.id, roleId: adminRole.id },
-  });
-
-  await prisma.userRole.upsert({
-    where: { userId_roleId: { userId: facultyUser.id, roleId: facultyRole.id } },
-    update: {},
-    create: { userId: facultyUser.id, roleId: facultyRole.id },
-  });
-
-  await prisma.userRole.upsert({
-    where: { userId_roleId: { userId: studentUser.id, roleId: studentRole.id } },
-    update: {},
-    create: { userId: studentUser.id, roleId: studentRole.id },
   });
 
   console.log("Roles assigned to users");
@@ -193,31 +167,6 @@ async function main() {
       departmentId: csDept.id,
       employeeNumber: "ADM001",
       designation: "Senior Administrator",
-    },
-  });
-
-  // Create FacultyProfile for faculty user
-  await prisma.facultyProfile.upsert({
-    where: { userId: facultyUser.id },
-    update: {},
-    create: {
-      userId: facultyUser.id,
-      departmentId: csDept.id,
-      employeeNumber: "FAC001",
-      designation: "Assistant Professor",
-    },
-  });
-
-  // Create StudentProfile for student user
-  await prisma.studentProfile.upsert({
-    where: { userId: studentUser.id },
-    update: {},
-    create: {
-      userId: studentUser.id,
-      departmentId: csDept.id,
-      studentNumber: "STU001",
-      admissionYear: 2024,
-      currentSemester: 3,
     },
   });
 

@@ -12,8 +12,8 @@ import { ArrowLeft } from 'lucide-react';
 export default function AdminLoginPage() {
   const { login } = useAuth();
   const [, setLocation] = useLocation();
-  const [email, setEmail] = useState('rajesh.kumar@university.edu');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
