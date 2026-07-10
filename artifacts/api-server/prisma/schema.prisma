@@ -187,6 +187,7 @@ model User {
   updatedSettings             SystemSetting[] @relation("SettingUpdatedBy")
 
   codeRuns                    CodeRun[]
+  examSessions                ExamSession[] @relation("SessionUser")
 
 }
 
@@ -217,8 +218,6 @@ model StudentProfile {
   department    Department? @relation("DepartmentStudents", fields: [departmentId], references: [id], onDelete: SetNull)
 
   enrollments   Enrollment[]
-
-  examSessions  ExamSession[] @relation("SessionStudentProfile")
 
 }
 
@@ -720,7 +719,7 @@ model ExamSession {
 
   exam      Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
 
-  student   StudentProfile @relation("SessionStudentProfile", fields: [studentUserId], references: [userId], onDelete: Cascade)
+  user   User @relation("SessionUser", fields: [studentUserId], references: [id], onDelete: Cascade)
 
   answers   StudentAnswer[]
 

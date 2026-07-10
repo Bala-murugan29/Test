@@ -33,7 +33,7 @@ export async function findSessionsByExam(
     app.prisma.examSession.findMany({
       where: { examId },
       include: {
-        student: { include: { user: true } },
+        user: true,
       },
       skip,
       take: limit,
@@ -43,18 +43,7 @@ export async function findSessionsByExam(
   ]);
 
   return {
-    data: sessions.map((s: {
-      id: string;
-      examId: string;
-      studentUserId: string;
-      attemptNo: number;
-      status: string;
-      startedAt: Date | null;
-      submittedAt: Date | null;
-      expiresAt: Date | null;
-      createdAt: Date;
-      student: { user: { fullName: string; email: string } };
-    }) => ({
+    data: sessions.map((s: any) => ({
       id: s.id,
       examId: s.examId,
       studentUserId: s.studentUserId,
@@ -64,8 +53,8 @@ export async function findSessionsByExam(
       submittedAt: s.submittedAt?.toISOString() ?? null,
       expiresAt: s.expiresAt?.toISOString() ?? null,
       createdAt: s.createdAt.toISOString(),
-      studentName: s.student.user.fullName,
-      studentEmail: s.student.user.email,
+      studentName: s.user.fullName,
+      studentEmail: s.user.email,
     })),
     meta: {
       page,

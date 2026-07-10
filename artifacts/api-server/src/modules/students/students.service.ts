@@ -127,11 +127,13 @@ export async function createStudent(app: FastifyInstance, data: CreateStudentBod
     throw new HttpError(409, "Student profile already exists for this user");
   }
 
-  const existingDepartment = await app.prisma.department.findUnique({
-    where: { id: data.departmentId },
-  });
-  if (!existingDepartment) {
-    throw new HttpError(404, "Department not found");
+  if (data.departmentId) {
+    const existingDepartment = await app.prisma.department.findUnique({
+      where: { id: data.departmentId },
+    });
+    if (!existingDepartment) {
+      throw new HttpError(404, "Department not found");
+    }
   }
 
   const existingNumber = await app.prisma.studentProfile.findUnique({
@@ -142,7 +144,7 @@ export async function createStudent(app: FastifyInstance, data: CreateStudentBod
   }
 
   const student = await studentsRepo.createStudent(app, data);
-  return formatStudent(student as StudentWithRelations);
+  return formatStudent(student as unknown as StudentWithRelations);
 }
 
 export async function updateStudent(

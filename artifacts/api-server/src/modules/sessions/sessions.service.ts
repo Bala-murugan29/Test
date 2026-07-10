@@ -153,14 +153,7 @@ export async function startSession(
     throw new HttpError(400, "Exam is not currently active");
   }
 
-  // Ensure the user has a StudentProfile
-  const studentProfile = await app.prisma.studentProfile.findUnique({
-    where: { userId: studentUserId },
-  });
 
-  if (!studentProfile) {
-    throw new HttpError(400, "User must have a student profile to attend an exam");
-  }
 
   const existingSession = await sessionsRepo.findSessionByExamAndStudent(
     app,

@@ -37,17 +37,7 @@ export async function findStudents(
   ]);
 
   return {
-    data: students.map((s: {
-      userId: string;
-      departmentId: string;
-      studentNumber: string;
-      admissionYear: number;
-      currentSemester: number;
-      gpa: { toNumber: () => number } | null;
-      createdAt: Date;
-      user: { id: string; email: string; fullName: string; phone: string | null; status: string; createdAt: Date };
-      department: { id: string; code: string; name: string };
-    }) => ({
+    data: students.map((s: any) => ({
       userId: s.userId,
       departmentId: s.departmentId,
       studentNumber: s.studentNumber,
@@ -95,7 +85,7 @@ export async function createStudent(
   return app.prisma.studentProfile.create({
     data: {
       userId: data.userId,
-      departmentId: data.departmentId,
+      departmentId: data.departmentId ?? null,
       studentNumber: data.studentNumber,
       admissionYear: data.admissionYear,
       currentSemester: data.currentSemester,
