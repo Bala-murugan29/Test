@@ -8,7 +8,7 @@ type SessionWithExam = {
   examId: string;
   attemptNo: number;
   exam: { id: string; title: string; passMarks: number; totalMarks: number } | null;
-  student: { userId: string; studentNumber: string } | null;
+  user: { id: string; fullName: string; email: string } | null;
 };
 
 type ResultWithSession = {
@@ -43,6 +43,7 @@ function formatResult(r: ResultWithSession) {
       examId: r.session.examId,
       attemptNo: r.session.attemptNo,
       exam: r.session.exam ? { title: r.session.exam.title } : null,
+      user: r.session.user ? { fullName: r.session.user.fullName, email: r.session.user.email } : null,
     } : null,
   };
 }

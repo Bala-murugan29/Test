@@ -28,7 +28,7 @@ export async function findResults(
         session: {
           include: {
             exam: { select: { id: true, title: true, passMarks: true, totalMarks: true } },
-            student: { select: { userId: true, studentNumber: true } },
+            user: { select: { id: true, fullName: true, email: true } },
           },
         },
       },
@@ -54,7 +54,7 @@ export async function findResults(
       createdAt: Date;
       session: {
         exam: { id: string; title: string } | null;
-        student: { userId: string; studentNumber: string } | null;
+        user: { id: string; fullName: string; email: string };
       };
     }) => ({
       id: r.id,
@@ -85,7 +85,7 @@ export async function findResultById(app: FastifyInstance, id: string) {
       session: {
         include: {
           exam: true,
-          student: true,
+          user: true,
           answers: true,
         },
       },
@@ -102,7 +102,7 @@ export async function findResultBySessionId(app: FastifyInstance, sessionId: str
       session: {
         include: {
           exam: true,
-          student: true,
+          user: true,
         },
       },
     },
@@ -151,7 +151,7 @@ export async function evaluateResult(
       session: {
         include: {
           exam: { select: { id: true, title: true, passMarks: true, totalMarks: true } },
-          student: { select: { userId: true, studentNumber: true } },
+          user: { select: { id: true, fullName: true, email: true } },
         },
       },
     },
@@ -187,7 +187,7 @@ export async function getCertificate(app: FastifyInstance, resultId: string) {
           session: {
             include: {
             exam: { select: { id: true, title: true, passMarks: true, totalMarks: true } },
-              student: { select: { userId: true, studentNumber: true } },
+              user: { select: { id: true, fullName: true, email: true } },
             },
           },
         },
@@ -205,7 +205,7 @@ export async function getStudentResults(app: FastifyInstance, studentUserId: str
       session: {
         include: {
           exam: { select: { id: true, title: true, passMarks: true, totalMarks: true } },
-          student: { select: { userId: true, studentNumber: true } },
+          user: { select: { id: true, fullName: true, email: true } },
         },
       },
       certificate: true,
@@ -223,7 +223,7 @@ export async function getExamResults(app: FastifyInstance, examId: string) {
       session: {
         include: {
           exam: { select: { id: true, title: true, passMarks: true, totalMarks: true } },
-          student: { select: { userId: true, studentNumber: true } },
+          user: { select: { id: true, fullName: true, email: true } },
         },
       },
       certificate: true,

@@ -12,11 +12,7 @@ export async function getExamReport(app: FastifyInstance, examId: string) {
       },
       sessions: {
         include: {
-          student: {
-            include: {
-              user: true,
-            },
-          },
+          user: true,
           result: true,
           answers: {
             include: {
@@ -32,10 +28,10 @@ export async function getExamReport(app: FastifyInstance, examId: string) {
 }
 
 export async function getStudentReport(app: FastifyInstance, studentUserId: string) {
-  const profile = await app.prisma.studentProfile.findUnique({
-    where: { userId: studentUserId },
+  const profile = await app.prisma.user.findUnique({
+    where: { id: studentUserId },
     include: {
-      user: true,
+      studentProfile: true,
       examSessions: {
         include: {
           exam: true,
@@ -66,11 +62,7 @@ export async function exportExamResults(app: FastifyInstance, examId: string) {
   const results = await app.prisma.examSession.findMany({
     where: { examId },
     include: {
-      student: {
-        include: {
-          user: true,
-        },
-      },
+      user: true,
       result: true,
       exam: true,
     },

@@ -5,9 +5,7 @@ import { HttpError } from "../../shared/errors/http-error";
 type SessionWithResult = {
   id: string;
   status: string;
-  student: {
-    user: { fullName: string };
-  };
+  user: { fullName: string };
   result: {
     obtainedMarks: number;
     maxMarks: number;
@@ -38,8 +36,8 @@ type ExamWithSessions = {
 };
 
 type StudentProfileWithSessions = {
-  userId: string;
-  user: { fullName: string };
+  id: string;
+  fullName: string;
   examSessions: Array<{
     exam: { id: string; title: string; totalMarks: number };
     result: {
@@ -156,8 +154,8 @@ export async function generateStudentReport(
   }));
 
   return {
-    studentUserId: profile.userId,
-    studentName: profile.user.fullName,
+    studentUserId: profile.id,
+    studentName: profile.fullName,
     totalExamsTaken,
     avgScore,
     passRate,
@@ -197,10 +195,8 @@ export async function generateDepartmentReport(
       include: { result: true },
     });
 
-    type SessionWithNullableResult = { result: { percentage: number; passed: boolean } | null };
-
     const percentages = results
-      .map((r: SessionWithNullableResult) => r.result?.percentage ?? 0)
+      .map((r: any) => (r.result?.percentage?.toNumber ? r.result.percentage.toNumber() : Number(r.result?.percentage ?? 0)))
       .filter((p: number) => p > 0);
     avgScore =
       percentages.length > 0
@@ -211,7 +207,7 @@ export async function generateDepartmentReport(
           ) / 100
         : 0;
 
-    const passedCount = results.filter((r: SessionWithNullableResult) => r.result?.passed).length;
+    const passedCount = results.filter((r: any) => r.result?.passed).length;
     passRate =
       results.length > 0
         ? Math.round((passedCount / results.length) * 10000) / 100
