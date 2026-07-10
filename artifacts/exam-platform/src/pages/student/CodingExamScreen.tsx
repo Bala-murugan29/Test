@@ -16,6 +16,7 @@ import type {
 import { LANGUAGE_LABELS } from '@/types/coding.types';
 import type { Exam } from '@/types';
 import { cn } from '@/utils/cn';
+import { useAntiCheat } from '@/hooks/useAntiCheat';
 
 type PanelTab = 'problem' | 'testcases' | 'output';
 type RunState = 'idle' | 'running' | 'done';
@@ -197,6 +198,13 @@ export default function CodingExamScreen() {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, []);
+
+  useAntiCheat({
+    onAutoSubmit: () => {
+      handleConfirmFinish();
+    },
+    maxViolations: 3,
+  });
 
   const problem = problems[currentIdx];
   const currentCode = problem ? (codes[problem.id]?.[language] ?? problem.starterCode[language]) : '';

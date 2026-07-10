@@ -155,9 +155,9 @@ export const getRegisterUrl = () => {
  * Create a new user account
  * @summary Register a new user
  */
-export const register = async (registerRequest: RegisterRequest, options?: RequestInit): Promise<AuthResponse> => {
+export const register = async (registerRequest: RegisterRequest, options?: RequestInit): Promise<MessageResponse> => {
 
-  return customFetch<AuthResponse>(getRegisterUrl(),
+  return customFetch<MessageResponse>(getRegisterUrl(),
   {
     ...options,
     method: 'POST',

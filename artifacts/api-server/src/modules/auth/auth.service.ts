@@ -33,9 +33,10 @@ export async function register(app: FastifyInstance, body: RegisterBody) {
   }
 
   const passwordHash = await bcrypt.hash(body.password, SALT_ROUNDS);
-  const user = await createUser(app, body, passwordHash);
+  // Create user as DISABLED pending admin approval
+  await createUser(app, body, passwordHash, "DISABLED");
 
-  return generateTokenPair(app, user, "register");
+  return { message: "Registration successful. Please wait for an administrator to approve your account." };
 }
 
 export async function login(

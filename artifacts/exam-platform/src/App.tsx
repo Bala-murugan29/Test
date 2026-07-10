@@ -6,9 +6,14 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth, connectAuthFailureHandler } from '@/hooks/useAuth';
 import { queryClient } from '@/lib/queryClient';
+import { tokenStorage } from '@/lib/token-storage';
+import { setAuthTokenGetter } from '@workspace/api-client-react';
+
+setAuthTokenGetter(() => tokenStorage.getAccessToken());
 
 import LandingPage from '@/pages/landing/LandingPage';
 import StudentLoginPage from '@/pages/auth/StudentLoginPage';
+import RegisterStudentPage from '@/pages/auth/RegisterStudentPage';
 import FacultyLoginPage from '@/pages/auth/FacultyLoginPage';
 import AdminLoginPage from '@/pages/auth/AdminLoginPage';
 
@@ -42,6 +47,7 @@ function Router() {
 
       {/* Auth — public */}
       <Route path="/login/student" component={StudentLoginPage} />
+      <Route path="/register/student" component={RegisterStudentPage} />
       <Route path="/login/faculty" component={FacultyLoginPage} />
       <Route path="/login/admin" component={AdminLoginPage} />
 

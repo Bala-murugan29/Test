@@ -27,23 +27,9 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       response: {
         201: {
           type: "object",
-          required: ["user", "accessToken", "refreshToken"],
+          required: ["message"],
           properties: {
-            user: {
-              type: "object",
-              required: ["id", "email", "fullName", "status", "roles", "createdAt"],
-              properties: {
-                id: { type: "string" },
-                email: { type: "string" },
-                fullName: { type: "string" },
-                phone: { type: "string", nullable: true },
-                status: { type: "string" },
-                roles: { type: "array", items: { type: "string" } },
-                createdAt: { type: "string" },
-              },
-            },
-            accessToken: { type: "string" },
-            refreshToken: { type: "string" },
+            message: { type: "string" },
           },
         },
       },

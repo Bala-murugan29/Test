@@ -8,6 +8,9 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { analyticsService } from '@/services/analytics.service';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { formatRelativeTime } from '@/utils/format';
+import { useListUsers, useUpdateUserStatus } from '@workspace/api-client-react';
+import { Button } from '@/components/ui/button';
+import { toast } from '@/hooks/use-toast';
 
 interface Summary {
   totalStudents: number;
@@ -32,6 +35,22 @@ export default function AdminDashboard() {
   const [, setLocation] = useLocation();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Fetch pending users
+  const { data: pendingUsersRes, refetch: refetchPending } = useListUsers({ status: 'DISABLED' });
+  const pendingUsers = pendingUsersRes?.data || [];
+  
+  const { mutateAsync: updateStatus } = useUpdateUserStatus();
+
+  const handleApprove = async (userId: string) => {
+    try {
+      await updateStatus({ id: userId, data: { status: 'ACTIVE' } });
+      toast({ title: 'User Approved', description: 'The user has been granted access.' });
+      refetchPending();
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Approval Failed', description: 'Could not approve the user.' });
+    }
+  };
 
   useEffect(() => {
     analyticsService.getPlatformSummary().then((s) => {
@@ -106,9 +125,11 @@ export default function AdminDashboard() {
             { label: 'Manage Users', href: '/admin/users', icon: <Users className="w-5 h-5" /> },
             { label: 'Departments', href: '/admin/departments', icon: <Building2 className="w-5 h-5" /> },
             { label: 'Platform Settings', href: '/admin/settings', icon: <TrendingUp className="w-5 h-5" /> },
+            { label: 'Add Faculty', href: '/admin/add-faculty', icon: <Users className="w-5 h-5" /> },
+            { label: 'Add Student', href: '/admin/add-student', icon: <BookOpen className="w-5 h-5" /> },
           ].map((a) => (
             <button
-              key={a.href}
+              key={a.label}
               onClick={() => setLocation(a.href)}
               data-testid={`quick-action-admin-${a.label.replace(/\s+/g, '-').toLowerCase()}`}
               className="flex items-center gap-3 p-3 rounded-lg border border-card-border hover:border-primary/50 hover:bg-primary/5 transition-colors text-left"
@@ -119,6 +140,24 @@ export default function AdminDashboard() {
           ))}
         </div>
       </div>
+
+      {/* Pending Approvals */}
+      {pendingUsers.length > 0 && (
+        <div className="mt-6 bg-card border border-card-border rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-4">Pending Approvals</h3>
+          <div className="flex flex-col gap-3">
+            {pendingUsers.map(user => (
+              <div key={user.id} className="flex items-center justify-between p-3 border border-card-border rounded-lg bg-background">
+                <div>
+                  <p className="text-sm font-medium text-foreground">{user.fullName}</p>
+                  <p className="text-xs text-muted-foreground">{user.email} &bull; {user.roles?.join(', ')}</p>
+                </div>
+                <Button size="sm" onClick={() => handleApprove(user.id)}>Approve</Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

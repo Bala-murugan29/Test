@@ -16,7 +16,7 @@ export async function registerController(
 ) {
   const body = registerBodySchema.parse(request.body);
   const result = await authService.register(request.server, body);
-  const payload = authResponseSchema.parse(result);
+  const payload = messageResponseSchema.parse(result);
   return reply.code(201).send(payload);
 }
 

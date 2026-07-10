@@ -68,8 +68,11 @@ export default function StudentLoginPage() {
         </Button>
       </form>
 
-      <div className="mt-5 text-center">
-        <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="link-back-to-landing">
+      <div className="mt-5 text-center flex flex-col gap-2">
+        <Link href="/register/student" className="inline-flex items-center justify-center gap-1.5 text-sm text-primary hover:underline transition-colors">
+          Don't have an account? Register here
+        </Link>
+        <Link href="/" className="inline-flex items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="link-back-to-landing">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to home
         </Link>
       </div>

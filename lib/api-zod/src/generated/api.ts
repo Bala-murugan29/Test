@@ -37,17 +37,7 @@ export const RegisterBody = zod.object({
 })
 
 export const RegisterResponse = zod.object({
-  "user": zod.object({
-  "id": zod.string().uuid(),
-  "email": zod.string().email(),
-  "fullName": zod.string(),
-  "phone": zod.string().nullish(),
-  "status": zod.enum(['ACTIVE', 'INVITED', 'SUSPENDED', 'DISABLED']),
-  "roles": zod.array(zod.string()),
-  "createdAt": zod.coerce.date()
-}),
-  "accessToken": zod.string(),
-  "refreshToken": zod.string()
+  "message": zod.string()
 })
 
 

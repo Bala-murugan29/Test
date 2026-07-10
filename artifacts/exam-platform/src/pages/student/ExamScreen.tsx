@@ -10,6 +10,8 @@ import { examService } from '@/services/exam.service';
 import { useExamSession } from '@/hooks/useExamSession';
 import { Exam, Question } from '@/types';
 
+import { useAntiCheat } from '@/hooks/useAntiCheat';
+
 export default function ExamScreen() {
   const { examId } = useParams<{ examId: string }>();
   const [, setLocation] = useLocation();
@@ -59,6 +61,14 @@ export default function ExamScreen() {
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
+
+  // Anti-Cheat integration
+  useAntiCheat({
+    onAutoSubmit: () => {
+      setLocation(`/student/exams/${examId}/submit`);
+    },
+    maxViolations: 3,
+  });
 
   // Warn on browser back/close
   useEffect(() => {

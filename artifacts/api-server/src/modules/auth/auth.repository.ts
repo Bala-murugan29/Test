@@ -19,6 +19,7 @@ export async function createUser(
   app: FastifyInstance,
   data: RegisterBody,
   passwordHash: string,
+  status: "ACTIVE" | "DISABLED" | "SUSPENDED" | "INVITED" = "ACTIVE"
 ) {
   const roleKey = data.role ?? "student";
 
@@ -33,6 +34,7 @@ export async function createUser(
       passwordHash,
       fullName: data.fullName,
       phone: data.phone,
+      status,
       userRoles: {
         create: { roleId: role.id },
       },
@@ -115,7 +117,7 @@ export async function createAuditLog(
       action,
       entityType,
       entityId,
-      metadata: metadata ?? undefined,
+      metadata: metadata ? (metadata as any) : undefined,
       ipAddress,
       userAgent,
     },
