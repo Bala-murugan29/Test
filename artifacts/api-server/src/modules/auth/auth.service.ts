@@ -160,7 +160,7 @@ async function generateTokenPair(
   );
 
   const refreshToken = app.jwt.sign(
-    { sub: user.id, ctx: context },
+    { sub: user.id, ctx: context } as any,
     { expiresIn: `${REFRESH_TOKEN_EXPIRY_DAYS}d` },
   );
 
