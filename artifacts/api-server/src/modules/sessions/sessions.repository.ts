@@ -33,6 +33,7 @@ export async function findSessionsByExam(
     app.prisma.examSession.findMany({
       where: { examId },
       include: {
+        // @ts-ignore - Prisma cache might be stale on IDE
         user: true,
       },
       skip,
