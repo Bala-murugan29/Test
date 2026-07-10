@@ -85,7 +85,7 @@ export async function createStudent(
   return app.prisma.studentProfile.create({
     data: {
       userId: data.userId,
-      departmentId: data.departmentId,
+      departmentId: data.departmentId as any,
       studentNumber: data.studentNumber,
       admissionYear: data.admissionYear,
       currentSemester: data.currentSemester,
