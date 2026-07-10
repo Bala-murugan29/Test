@@ -196,7 +196,7 @@ model StudentProfile {
 
   userId          String   @id @db.Uuid
 
-  departmentId    String   @db.Uuid
+  departmentId    String?  @db.Uuid
 
   studentNumber   String   @unique
 
@@ -214,7 +214,7 @@ model StudentProfile {
 
   user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  department    Department @relation("DepartmentStudents", fields: [departmentId], references: [id], onDelete: Restrict)
+  department    Department? @relation("DepartmentStudents", fields: [departmentId], references: [id], onDelete: SetNull)
 
   enrollments   Enrollment[]
 

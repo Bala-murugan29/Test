@@ -9,7 +9,7 @@ const paginationQuerySchema = z.object({
 
 const createStudentBodySchema = z.object({
   userId: z.string().uuid(),
-  departmentId: z.string().uuid(),
+  departmentId: z.string().uuid().optional(),
   studentNumber: z.string().min(1).max(50),
   admissionYear: z.number().int().min(2000).max(2100),
   currentSemester: z.number().int().min(1).max(12),
@@ -28,7 +28,7 @@ const enrollBodySchema = z.object({
 
 const studentResponseSchema = z.object({
   userId: z.string().uuid(),
-  departmentId: z.string().uuid(),
+  departmentId: z.string().uuid().nullable().optional(),
   studentNumber: z.string(),
   admissionYear: z.number(),
   currentSemester: z.number(),
@@ -45,7 +45,7 @@ const studentResponseSchema = z.object({
     id: z.string().uuid(),
     code: z.string(),
     name: z.string(),
-  }),
+  }).nullable().optional(),
   createdAt: z.string().datetime(),
 });
 

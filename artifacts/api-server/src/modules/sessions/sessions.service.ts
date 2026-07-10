@@ -159,7 +159,7 @@ export async function startSession(
   });
 
   if (!studentProfile) {
-    throw new HttpError(400, "User must have a student profile (and department) to attend an exam");
+    throw new HttpError(400, "User must have a student profile to attend an exam");
   }
 
   const existingSession = await sessionsRepo.findSessionByExamAndStudent(
