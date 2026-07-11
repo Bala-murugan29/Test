@@ -52,9 +52,12 @@ export function buildApp(): FastifyInstance {
       typeof error.statusCode === "number"
         ? error.statusCode
         : 500;
-    const message = error instanceof Error ? error.message : "Internal Server Error";
+    if (statusCode >= 500) {
+      console.error("Unhandled 500 error:", error);
+    }
+    const message = error instanceof Error ? error.stack || error.message : "Internal Server Error";
     reply.status(statusCode).send({
-      error: statusCode >= 500 ? "Internal Server Error" : message,
+      error: statusCode >= 500 ? message : message,
       requestId: request.id,
     });
   });

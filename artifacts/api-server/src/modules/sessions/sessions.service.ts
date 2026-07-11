@@ -129,6 +129,12 @@ export async function startSession(
   examId: string,
   studentUserId: string,
 ) {
+  // 1. Verify user exists (protects against stale JWTs after a DB reset)
+  const user = await app.prisma.user.findUnique({ where: { id: studentUserId } });
+  if (!user) {
+    throw new HttpError(401, "User session is invalid. Please log in again.");
+  }
+
   const exam = await app.prisma.exam.findUnique({ where: { id: examId } });
   if (!exam) {
     throw new HttpError(404, "Exam not found");
