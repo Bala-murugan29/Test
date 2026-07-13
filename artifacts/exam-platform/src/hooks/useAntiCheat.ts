@@ -8,6 +8,9 @@ interface UseAntiCheatOptions {
 
 export function useAntiCheat({ onAutoSubmit, maxViolations = 3 }: UseAntiCheatOptions) {
   const [violations, setViolations] = useState(0);
+  const [isFullScreen, setIsFullScreen] = useState(
+    typeof document !== 'undefined' ? !!document.fullscreenElement : true
+  );
   const { toast } = useToast();
   
   const onAutoSubmitRef = useRef(onAutoSubmit);
@@ -50,6 +53,18 @@ export function useAntiCheat({ onAutoSubmit, maxViolations = 3 }: UseAntiCheatOp
       }
     };
     
+    const handleFullScreenChange = () => {
+      const isFull = !!document.fullscreenElement;
+      setIsFullScreen(isFull);
+      
+      // If they were just in full screen and exited, it's a violation.
+      // (The browser allows exiting via ESC).
+      if (!isFull) {
+        handleViolation("Exiting full screen is not allowed");
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFullScreenChange);
+
     // We try to request fullscreen on the first click
     const handleFirstInteraction = () => {
       requestFullScreen();
@@ -134,7 +149,14 @@ export function useAntiCheat({ onAutoSubmit, maxViolations = 3 }: UseAntiCheatOp
       if (document.activeElement && document.activeElement.tagName === 'IFRAME') {
         return;
       }
-      handleViolation("Switching away from the exam window is not allowed");
+      
+      // Use a small timeout to distinguish between native dropdowns (which might blur briefly)
+      // and actually leaving the browser window.
+      setTimeout(() => {
+        if (!document.hasFocus()) {
+          handleViolation("Switching away from the exam window is not allowed");
+        }
+      }, 100);
     };
     window.addEventListener('blur', handleBlur, { capture: true });
 
@@ -148,6 +170,7 @@ export function useAntiCheat({ onAutoSubmit, maxViolations = 3 }: UseAntiCheatOp
       window.removeEventListener('keydown', handleKeyDown, { capture: true });
       document.removeEventListener('visibilitychange', handleVisibilityChange, { capture: true });
       window.removeEventListener('blur', handleBlur, { capture: true });
+      document.removeEventListener('fullscreenchange', handleFullScreenChange);
       
       if (document.fullscreenElement) {
         document.exitFullscreen().catch(err => console.warn(err));
@@ -155,5 +178,9 @@ export function useAntiCheat({ onAutoSubmit, maxViolations = 3 }: UseAntiCheatOp
     };
   }, [handleViolation]);
 
-  return { violations };
+  return { violations, isFullScreen, requestFullScreen: () => {
+    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(err => console.warn(err));
+    }
+  } };
 }

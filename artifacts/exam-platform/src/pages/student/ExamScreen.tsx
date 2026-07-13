@@ -8,9 +8,11 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { examService } from '@/services/exam.service';
 import { useExamSession } from '@/hooks/useExamSession';
+import { useExamSessionStore } from '@/store/exam-session.store';
 import { Exam, Question } from '@/types';
 
 import { useAntiCheat } from '@/hooks/useAntiCheat';
+import { AlertTriangle } from 'lucide-react';
 
 export default function ExamScreen() {
   const { examId } = useParams<{ examId: string }>();
@@ -32,8 +34,16 @@ export default function ExamScreen() {
     setTimeRemaining,
   } = useExamSession();
 
+  const storeExamId = useExamSessionStore((s) => s.examId);
+
   useEffect(() => {
-    if (!examId) return;
+    if (examId && storeExamId !== examId) {
+      setLocation('/student/dashboard', { replace: true });
+    }
+  }, [examId, storeExamId, setLocation]);
+
+  useEffect(() => {
+    if (!examId || storeExamId !== examId) return;
     Promise.all([examService.getExamById(examId), examService.getExamQuestions(examId)]).then(([e, q]) => {
       setExam(e);
       setQuestions(q);
@@ -41,7 +51,7 @@ export default function ExamScreen() {
       setLoading(false);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [examId]);
+  }, [examId, storeExamId]);
 
   // Countdown
   useEffect(() => {
@@ -53,7 +63,7 @@ export default function ExamScreen() {
         setTimeRemaining(next);
         if (next <= 0) {
           clearInterval(interval);
-          setLocation(`/student/exams/${examId}/submit`);
+          setLocation(`/student/exams/${examId}/submit`, { replace: true });
         }
         return next;
       });
@@ -63,9 +73,9 @@ export default function ExamScreen() {
   }, [loading]);
 
   // Anti-Cheat integration
-  useAntiCheat({
+  const { isFullScreen, requestFullScreen } = useAntiCheat({
     onAutoSubmit: () => {
-      setLocation(`/student/exams/${examId}/submit`);
+      setLocation(`/student/exams/${examId}/submit`, { replace: true });
     },
     maxViolations: 3,
   });
@@ -103,8 +113,21 @@ export default function ExamScreen() {
   const currentQuestion = questions[currentQuestionIndex];
 
   return (
-    <ExamLayout
-      examTitle={exam.title}
+    <>
+      {!isFullScreen && (
+        <div className="fixed inset-0 z-[9999] bg-background/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
+          <AlertTriangle className="w-16 h-16 text-destructive mb-6" />
+          <h2 className="text-2xl font-bold mb-2">Full Screen Required</h2>
+          <p className="text-muted-foreground max-w-md mb-8">
+            You must be in full-screen mode to continue the exam. Exiting full-screen is recorded as a violation.
+          </p>
+          <Button size="lg" onClick={requestFullScreen}>
+            Return to Full Screen
+          </Button>
+        </div>
+      )}
+      <ExamLayout
+        examTitle={exam.title}
       timeRemainingSeconds={localTime}
       answeredCount={answeredCount}
       totalQuestions={questions.length}
@@ -136,7 +159,7 @@ export default function ExamScreen() {
               <div className="flex gap-2">
                 {currentQuestionIndex === questions.length - 1 ? (
                   <Button
-                    onClick={() => setLocation(`/student/exams/${examId}/submit`)}
+                    onClick={() => setLocation(`/student/exams/${examId}/submit`, { replace: true })}
                     data-testid="button-submit-exam"
                   >
                     Review &amp; Submit
@@ -164,7 +187,7 @@ export default function ExamScreen() {
             <Button
               variant="outline"
               className="w-full"
-              onClick={() => setLocation(`/student/exams/${examId}/submit`)}
+              onClick={() => setLocation(`/student/exams/${examId}/submit`, { replace: true })}
               data-testid="button-finish-exam"
             >
               Finish Exam
@@ -173,5 +196,6 @@ export default function ExamScreen() {
         </div>
       </div>
     </ExamLayout>
+    </>
   );
 }

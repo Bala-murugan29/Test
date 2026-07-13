@@ -92,10 +92,17 @@ export default function CodingExamScreen() {
   );
   // Also watch the store so any external update is reflected.
   const storedSessionId = useExamSessionStore((s) => s.sessionId);
+  const storeExamId = useExamSessionStore((s) => s.examId);
   const effectiveSessionId = activeSessionId ?? storedSessionId;
 
   useEffect(() => {
-    if (!examId) return;
+    if (examId && storeExamId !== examId) {
+      setLocation('/student/dashboard', { replace: true });
+    }
+  }, [examId, storeExamId, setLocation]);
+
+  useEffect(() => {
+    if (!examId || storeExamId !== examId) return;
     examService.getExamById(examId).then(async (e) => {
       setExam(e);
       setTimeLeft((e?.durationMinutes ?? 60) * 60);
@@ -199,7 +206,7 @@ export default function CodingExamScreen() {
     return () => window.removeEventListener('beforeunload', handler);
   }, []);
 
-  useAntiCheat({
+  const { isFullScreen, requestFullScreen } = useAntiCheat({
     onAutoSubmit: () => {
       handleConfirmFinish();
     },
@@ -433,7 +440,8 @@ export default function CodingExamScreen() {
       await apiPost(`/sessions/${sessionId}/submit`);
 
       // 4. Navigate to result page
-      setLocation(`/student/exams/${examId}/result`);
+      useExamSessionStore.getState().clearSession();
+      setLocation(`/student/exams/${examId}/result`, { replace: true });
     } catch (err) {
       console.error('Failed to submit exam:', err);
       alert(`Failed to submit exam: ${err instanceof Error ? err.message : 'Please try again.'}`);
@@ -467,6 +475,18 @@ export default function CodingExamScreen() {
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden" data-testid="coding-exam-screen">
+      {!isFullScreen && (
+        <div className="fixed inset-0 z-[9999] bg-background/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
+          <AlertTriangle className="w-16 h-16 text-destructive mb-6" />
+          <h2 className="text-2xl font-bold mb-2">Full Screen Required</h2>
+          <p className="text-muted-foreground max-w-md mb-8">
+            You must be in full-screen mode to continue the exam. Exiting full-screen is recorded as a violation.
+          </p>
+          <Button size="lg" onClick={requestFullScreen}>
+            Return to Full Screen
+          </Button>
+        </div>
+      )}
       {/* ── Top bar ───────────────────────────────────────────────────────── */}
       <header className="h-12 border-b border-card-border flex items-center px-4 gap-4 shrink-0 bg-card z-20">
         <div className="flex items-center gap-2">

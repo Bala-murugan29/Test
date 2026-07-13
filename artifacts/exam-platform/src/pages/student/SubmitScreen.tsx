@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { examService } from '@/services/exam.service';
 import { resultService } from '@/services/result.service';
 import { useExamSession } from '@/hooks/useExamSession';
+import { useExamSessionStore } from '@/store/exam-session.store';
 import { useAuth } from '@/hooks/useAuth';
 import { Exam, Question } from '@/types';
 
@@ -21,6 +22,14 @@ export default function SubmitScreen() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const storeExamId = useExamSessionStore((s) => s.examId);
+
+  useEffect(() => {
+    if (examId && storeExamId !== examId) {
+      setLocation('/student/dashboard', { replace: true });
+    }
+  }, [examId, storeExamId, setLocation]);
 
   useEffect(() => {
     if (!examId) return;
@@ -41,11 +50,11 @@ export default function SubmitScreen() {
     try {
       await resultService.submitExam(examId, user.id, answers);
       submitExam();
-      setLocation(`/student/exams/${examId}/result`);
+      clearSession();
+      setLocation(`/student/exams/${examId}/result`, { replace: true });
     } catch {
       setSubmitting(false);
     }
-    clearSession();
   };
 
   if (loading || !exam) {

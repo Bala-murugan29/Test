@@ -37,6 +37,7 @@ export function CodeEditor({ language, value, onChange, readOnly = false, height
         scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
         overviewRulerLanes: 0,
         guides: { indentation: true },
+        contextmenu: false,
         bracketPairColorization: { enabled: true },
         suggestOnTriggerCharacters: true,
         quickSuggestions: true,
