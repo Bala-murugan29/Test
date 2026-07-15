@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '@/lib/axios';
+import { apiGet, apiPost, apiPut } from '@/lib/axios';
 import type { ExamResult } from '@/types';
 
 /* ---------- backend shapes ---------- */
@@ -89,7 +89,7 @@ export const resultService = {
       questionId,
       selectedOptionIndex: parseInt(selectedOptionId, 10),
     }));
-    await apiPost(`/sessions/${sessionId}/answers`, { answers: answerEntries });
+    await apiPut(`/sessions/${sessionId}/answers`, { answers: answerEntries });
 
     // 3. Submit the session.
     await apiPost(`/sessions/${sessionId}/submit`);

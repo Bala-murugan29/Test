@@ -346,10 +346,7 @@ export async function submitSession(app: FastifyInstance, sessionId: string) {
     throw new HttpError(400, "Session already submitted or in terminal state");
   }
 
-  if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
-    await sessionsRepo.updateSessionStatus(app, sessionId, "AUTO_SUBMITTED");
-    throw new HttpError(400, "Session has expired and was auto-submitted");
-  }
+  const isExpired = session.expiresAt && new Date(session.expiresAt) < new Date();
 
   // Auto-grade answers before marking as submitted.
   const answers = session.answers ?? [];
@@ -388,7 +385,8 @@ export async function submitSession(app: FastifyInstance, sessionId: string) {
     }
   }
 
-  const updated = await sessionsRepo.updateSessionStatus(app, sessionId, "SUBMITTED");
+  const newStatus = isExpired ? "AUTO_SUBMITTED" : "SUBMITTED";
+  const updated = await sessionsRepo.updateSessionStatus(app, sessionId, newStatus);
 
   // Auto-evaluate and create Result so the frontend gets immediate feedback.
   try {

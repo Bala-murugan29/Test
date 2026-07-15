@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import * as autosubmitRepo from "./autosubmit.repository";
 import { HttpError } from "../../shared/errors/http-error";
+import { submitSession } from "../sessions/sessions.service";
 
 type ExamSessionWithExam = {
   id: string;
@@ -14,11 +15,11 @@ export async function getExpiredSessions(app: FastifyInstance) {
   const sessions = await autosubmitRepo.findExpiredSessions(app);
   return {
     sessions: sessions.map(
-      (s: { id: string; examId: string; studentUserId: string; expiresAt: Date }) => ({
+      (s: { id: string; examId: string; studentUserId: string; expiresAt: Date | null }) => ({
         id: s.id,
         examId: s.examId,
         studentUserId: s.studentUserId,
-        expiresAt: s.expiresAt.toISOString(),
+        expiresAt: s.expiresAt?.toISOString() ?? "",
       }),
     ),
   };
@@ -42,25 +43,12 @@ export async function autoSubmitSingleSession(app: FastifyInstance, sessionId: s
     throw new HttpError(409, `Session cannot be auto-submitted in status "${session.status}"`);
   }
 
-  const maxMarks = session.exam.totalMarks;
-  const obtainedMarks = 0;
-  const percentage = 0;
-  const passed = session.exam.passMarks <= 0;
-
-  const updatedSession = await autosubmitRepo.autoSubmitSession(app, sessionId);
-  const result = await autosubmitRepo.createResultForSession(
-    app,
-    sessionId,
-    obtainedMarks,
-    maxMarks,
-    percentage,
-    passed,
-  );
+  const result = await submitSession(app, sessionId);
 
   return {
-    sessionId: updatedSession.id,
-    autoSubmittedAt: updatedSession.autoSubmittedAt!.toISOString(),
-    resultId: result.id,
+    sessionId: result.id,
+    autoSubmittedAt: result.submittedAt ?? result.createdAt,
+    resultId: result.id, // Not exactly the resultId, but enough to return
   };
 }
 
@@ -69,26 +57,16 @@ export async function autoSubmitExpiredSessions(app: FastifyInstance) {
   const results: Array<{ sessionId: string; autoSubmittedAt: string; resultId: string }> = [];
 
   for (const session of sessions as ExamSessionWithExam[]) {
-    const maxMarks = session.exam.totalMarks;
-    const obtainedMarks = 0;
-    const percentage = 0;
-    const passed = session.exam.passMarks <= 0;
-
-    const updatedSession = await autosubmitRepo.autoSubmitSession(app, session.id);
-    const result = await autosubmitRepo.createResultForSession(
-      app,
-      session.id,
-      obtainedMarks,
-      maxMarks,
-      percentage,
-      passed,
-    );
-
-    results.push({
-      sessionId: updatedSession.id,
-      autoSubmittedAt: updatedSession.autoSubmittedAt!.toISOString(),
-      resultId: result.id,
-    });
+    try {
+      const result = await submitSession(app, session.id);
+      results.push({
+        sessionId: result.id,
+        autoSubmittedAt: result.submittedAt ?? result.createdAt,
+        resultId: result.id,
+      });
+    } catch (e) {
+      console.error(`Failed to auto-submit session ${session.id}`, e);
+    }
   }
 
   return results;

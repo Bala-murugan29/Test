@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '@/lib/axios';
+import { apiGet, apiPost, apiPut } from '@/lib/axios';
 
 /* ---------- backend shapes ---------- */
 
@@ -97,7 +97,7 @@ export const sessionService = {
       codeAnswer?: string;
     },
   ): Promise<void> {
-    await apiPost(`/sessions/${sessionId}/answers`, answer);
+    await apiPut(`/sessions/${sessionId}/answers`, answer);
   },
 
   async saveAnswers(
@@ -109,7 +109,7 @@ export const sessionService = {
       codeAnswer?: string;
     }>,
   ): Promise<void> {
-    await apiPost(`/sessions/${sessionId}/answers`, { answers });
+    await apiPut(`/sessions/${sessionId}/answers`, { answers });
   },
 
   async getSavedAnswers(sessionId: string): Promise<SessionAnswersResponse> {
