@@ -166,6 +166,7 @@ function mapQuestion(q: BackendQuestion, examId: string): Question {
       ? {
           starterCode: q.coding.starterCode ?? undefined,
           testCases: q.coding.testCases ?? [],
+          languageConstraints: q.coding.languageConstraints ?? undefined,
           sampleInput: q.coding.sampleInput ?? undefined,
           sampleOutput: q.coding.sampleOutput ?? undefined,
         }

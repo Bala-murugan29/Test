@@ -48,7 +48,7 @@ export default function SubmitScreen() {
     if (!examId || !user) return;
     setSubmitting(true);
     try {
-      await resultService.submitExam(examId, user.id, answers);
+      await resultService.submitExam(examId, user.id, answers, questions);
       submitExam();
       clearSession();
       setLocation(`/student/exams/${examId}/result`, { replace: true });

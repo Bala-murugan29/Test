@@ -18,6 +18,7 @@ export interface Question {
   coding?: {
     starterCode?: string;
     testCases: { input: string; expectedOutput: string; isHidden?: boolean }[];
+    languageConstraints?: string[];
     sampleInput?: string;
     sampleOutput?: string;
   };

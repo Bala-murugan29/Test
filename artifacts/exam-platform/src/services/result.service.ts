@@ -66,6 +66,7 @@ export const resultService = {
     examId: string,
     _studentId: string,
     answers: Record<string, string>,
+    questions: { id: string; type: string }[] = [],
   ): Promise<ExamResult> {
     // 1. Start a session (or get existing one).
     let sessionId = '';
@@ -85,10 +86,15 @@ export const resultService = {
     }
 
     // 2. Save all answers via autosave.
-    const answerEntries = Object.entries(answers).map(([questionId, selectedOptionId]) => ({
-      questionId,
-      selectedOptionIndex: parseInt(selectedOptionId, 10),
-    }));
+    const answerEntries = Object.entries(answers).map(([questionId, answerValue]) => {
+      const question = questions.find((q) => q.id === questionId);
+      const isCoding = question ? question.type === 'coding' : !/^\d+$/.test(answerValue);
+      return {
+        questionId,
+        selectedOptionIndex: isCoding ? undefined : parseInt(answerValue, 10),
+        codeAnswer: isCoding ? answerValue : undefined,
+      };
+    });
     await apiPut(`/sessions/${sessionId}/answers`, { answers: answerEntries });
 
     // 3. Submit the session.

@@ -1,8 +1,10 @@
 import { Flag } from 'lucide-react';
 import { Question } from '@/types';
 import { AnswerOption } from './AnswerOption';
+import { CodeEditor } from './CodeEditor';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/utils/cn';
+import { Language } from '@/types/coding.types';
 
 interface QuestionCardProps {
   question: Question;
@@ -58,15 +60,25 @@ export function QuestionCard({
       </div>
 
       <div className="flex flex-col gap-3">
-        {question.options.map((option, idx) => (
-          <AnswerOption
-            key={option.id}
-            option={option}
-            selected={selectedOptionId === option.id}
-            onSelect={onAnswer}
-            optionIndex={idx}
-          />
-        ))}
+        {question.type === 'coding' ? (
+          <div className="h-[400px] border border-card-border rounded-lg overflow-hidden">
+            <CodeEditor
+              language={(question.coding?.languageConstraints?.[0] as Language) || 'python'}
+              value={selectedOptionId || question.coding?.starterCode || ''}
+              onChange={onAnswer}
+            />
+          </div>
+        ) : (
+          question.options.map((option, idx) => (
+            <AnswerOption
+              key={option.id}
+              option={option}
+              selected={selectedOptionId === option.id}
+              onSelect={onAnswer}
+              optionIndex={idx}
+            />
+          ))
+        )}
       </div>
     </div>
   );
