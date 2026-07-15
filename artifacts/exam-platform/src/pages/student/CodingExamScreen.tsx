@@ -122,8 +122,8 @@ export default function CodingExamScreen() {
             };
 
             const testCases = q.coding?.testCases ?? [];
-            const sampleTests = testCases.filter((_t, i) => i < 2); // first 2 are sample
-            const hiddenTests = testCases.filter((_t, i) => i >= 2); // rest are hidden
+            const sampleTests = testCases.filter((t) => !t.isHidden);
+            const hiddenTests = testCases.filter((t) => t.isHidden);
 
             return {
               id: q.id,
