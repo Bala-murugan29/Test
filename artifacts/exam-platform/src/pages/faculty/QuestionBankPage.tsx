@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'wouter';
-import { Plus, Pencil, Trash2, Library, Code, List } from 'lucide-react';
+import { Plus, Pencil, Trash2, Library, Code, List, Sparkles } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
@@ -14,6 +14,8 @@ import { questionService } from '@/services/question.service';
 import { apiGet, apiPost, apiDelete } from '@/lib/axios';
 import { Exam, Question } from '@/types';
 import { cn } from '@/utils/cn';
+import { useToast } from '@/hooks/use-toast';
+import { useGenerateAiQuestions } from '@workspace/api-client-react';
 
 export default function QuestionBankPage() {
   const { examId } = useParams<{ examId: string }>();
@@ -25,7 +27,7 @@ export default function QuestionBankPage() {
   const [departmentId, setDepartmentId] = useState<string>('');
 
   // Form states
-  const [questionType, setQuestionType] = useState<'mcq' | 'coding'>('mcq');
+  const [questionType, setQuestionType] = useState<'mcq' | 'coding' | 'ai'>('mcq');
   const [qTitle, setQTitle] = useState('');
   const [qText, setQText] = useState('');
   const [qMarks, setQMarks] = useState('2');
@@ -40,6 +42,33 @@ export default function QuestionBankPage() {
     { input: '', expectedOutput: '', isHidden: false },
     { input: '', expectedOutput: '', isHidden: true },
   ]);
+
+  // AI Generator states
+  const [aiTopic, setAiTopic] = useState('');
+  const [aiType, setAiType] = useState<'MCQ' | 'CODING'>('MCQ');
+  const [aiDifficulty, setAiDifficulty] = useState('3');
+  const [aiCount, setAiCount] = useState('1');
+  const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([]);
+  const { toast } = useToast();
+
+  const generateMutation = useGenerateAiQuestions({
+    mutation: {
+      onSuccess: (data) => {
+        setGeneratedQuestions(data);
+        toast({
+          title: "Questions generated!",
+          description: `Successfully generated ${data.length} questions.`,
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Generation failed",
+          description: error.message || "Could not generate questions.",
+          variant: "destructive",
+        });
+      },
+    },
+  });
 
   const loadQuestions = () => {
     if (!examId) return;
@@ -70,6 +99,89 @@ export default function QuestionBankPage() {
       console.error(err);
     }
     setDeleteTarget(null);
+  };
+
+  const handleGenerateAi = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!aiTopic.trim()) {
+      toast({ title: "Topic is required", variant: "destructive" });
+      return;
+    }
+    
+    generateMutation.mutate({
+      data: {
+        topic: aiTopic,
+        difficulty: parseInt(aiDifficulty, 10),
+        type: aiType,
+        count: parseInt(aiCount, 10),
+      }
+    });
+  };
+
+  const handleSaveGeneratedToExam = async (qIndex: number) => {
+    const q = generatedQuestions[qIndex];
+    if (!examId) return;
+
+    let targetDeptId = departmentId;
+    if (!targetDeptId) {
+      try {
+        const depts = await apiGet<any>('/departments', { params: { page: 1, limit: 1 } });
+        if (depts.data && depts.data.length > 0) {
+          targetDeptId = depts.data[0].id;
+          setDepartmentId(targetDeptId);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    if (!targetDeptId) {
+      toast({ title: "Error", description: "Department not found", variant: "destructive" });
+      return;
+    }
+
+    try {
+      let createdQuestionId = '';
+      if (aiType === 'MCQ') {
+        const formattedOptions = q.options?.length ? q.options : [{text: "Option A"}];
+        const res = await questionService.createMcq({
+          departmentId: targetDeptId,
+          title: q.title || aiTopic,
+          prompt: q.prompt,
+          difficulty: parseInt(aiDifficulty, 10),
+          marks: 2,
+          options: formattedOptions,
+          correctOptionIndex: q.correctOptionIndex || 0,
+        });
+        createdQuestionId = res.id;
+      } else {
+        const res = await questionService.createCoding({
+          departmentId: targetDeptId,
+          title: q.title || aiTopic,
+          prompt: q.prompt,
+          difficulty: parseInt(aiDifficulty, 10),
+          marks: 5,
+          testCases: q.testCases || [],
+          sampleInput: q.sampleInput || '',
+          sampleOutput: q.sampleOutput || '',
+        });
+        createdQuestionId = res.id;
+      }
+
+      await apiPost(`/exams/${examId}/questions`, {
+        questionId: createdQuestionId,
+        sequenceNo: questions.length + 1,
+        marksOverride: aiType === 'MCQ' ? 2 : 5,
+        negativeMarks: 0,
+        isMandatory: true,
+      });
+
+      toast({ title: "Success", description: "Question added to exam." });
+      setGeneratedQuestions(prev => prev.filter((_, i) => i !== qIndex));
+      loadQuestions();
+    } catch (err: any) {
+      console.error(err);
+      toast({ title: "Failed to add question", description: err.message || "Something went wrong", variant: "destructive" });
+    }
   };
 
   const handleAddQuestion = async () => {
@@ -206,19 +318,30 @@ export default function QuestionBankPage() {
             >
               <Code className="w-4.5 h-4.5 mr-1.5" /> Coding Question
             </Button>
+            <Button
+              type="button"
+              variant={questionType === 'ai' ? 'default' : 'outline'}
+              onClick={() => setQuestionType('ai')}
+              size="sm"
+              className={cn(questionType === 'ai' ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-transparent' : 'text-indigo-600 border-indigo-200 hover:bg-indigo-50')}
+            >
+              <Sparkles className="w-4.5 h-4.5 mr-1.5" /> Generate with AI
+            </Button>
           </div>
 
           <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="q-title">Question Title *</Label>
-              <Input
-                id="q-title"
-                value={qTitle}
-                onChange={(e) => setQTitle(e.target.value)}
-                placeholder="e.g. Two Sum"
-                data-testid="input-question-title"
-              />
-            </div>
+            {questionType !== 'ai' && (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="q-title">Question Title *</Label>
+                  <Input
+                    id="q-title"
+                    value={qTitle}
+                    onChange={(e) => setQTitle(e.target.value)}
+                    placeholder="e.g. Two Sum"
+                    data-testid="input-question-title"
+                  />
+                </div>
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="q-text">Question Prompt / Description *</Label>
@@ -253,7 +376,9 @@ export default function QuestionBankPage() {
                   <option value="5">5 (Hard)</option>
                 </select>
               </div>
-            </div>
+                </div>
+              </>
+            )}
 
             {/* MCQ Options */}
             {questionType === 'mcq' && (
@@ -410,10 +535,145 @@ export default function QuestionBankPage() {
               </div>
             )}
 
-            <div className="flex gap-2 justify-end mt-4">
-              <Button variant="outline" onClick={() => setAddingNew(false)} data-testid="button-cancel-add">Cancel</Button>
-              <Button onClick={handleAddQuestion} disabled={!qText.trim() || !qTitle.trim()} data-testid="button-save-question">Add Question</Button>
-            </div>
+            {questionType === 'ai' && (
+              <div className="flex flex-col gap-6">
+                <form onSubmit={handleGenerateAi} className="flex flex-col gap-4 border border-indigo-100 bg-indigo-50/30 p-4 rounded-xl">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="ai-topic">Topic / Description</Label>
+                      <Input
+                        id="ai-topic"
+                        placeholder="e.g. React Hooks, Binary Trees..."
+                        value={aiTopic}
+                        onChange={(e) => setAiTopic(e.target.value)}
+                        disabled={generateMutation.isPending}
+                      />
+                    </div>
+                    
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="ai-type">Type</Label>
+                      <select
+                        id="ai-type"
+                        value={aiType}
+                        onChange={(e) => setAiType(e.target.value as "MCQ" | "CODING")}
+                        disabled={generateMutation.isPending}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="MCQ">Multiple Choice</option>
+                        <option value="CODING">Coding</option>
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="ai-diff">Difficulty (1-5)</Label>
+                      <select
+                        id="ai-diff"
+                        value={aiDifficulty}
+                        onChange={(e) => setAiDifficulty(e.target.value)}
+                        disabled={generateMutation.isPending}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {[1, 2, 3, 4, 5].map((d) => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="ai-count">Number of Questions</Label>
+                      <Input
+                        id="ai-count"
+                        type="number"
+                        min="1"
+                        max="5"
+                        value={aiCount}
+                        onChange={(e) => setAiCount(e.target.value)}
+                        disabled={generateMutation.isPending}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end pt-2">
+                    <Button 
+                      type="submit" 
+                      disabled={generateMutation.isPending || !aiTopic.trim()}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                    >
+                      {generateMutation.isPending ? (
+                        <>Generating...</>
+                      ) : (
+                        <><Sparkles className="w-4 h-4 mr-2" /> Generate Questions</>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+
+                {generatedQuestions.length > 0 && (
+                  <div className="space-y-4 border-t border-border pt-4">
+                    <h4 className="font-semibold">Generated Previews ({generatedQuestions.length})</h4>
+                    {generatedQuestions.map((q, index) => (
+                      <div key={index} className="border border-card-border p-4 rounded-xl space-y-3 bg-card shadow-sm">
+                        <div className="flex justify-between items-start gap-4">
+                          <h5 className="font-medium text-base">{q.title || `Generated Question ${index + 1}`}</h5>
+                          <Button size="sm" onClick={() => handleSaveGeneratedToExam(index)}>
+                            <Plus className="w-4 h-4 mr-1.5" /> Add to Exam
+                          </Button>
+                        </div>
+                        
+                        <div>
+                          <Label className="text-xs text-muted-foreground uppercase">Prompt</Label>
+                          <div className="text-sm mt-1 whitespace-pre-wrap">{q.prompt}</div>
+                        </div>
+                        
+                        {aiType === "MCQ" && q.options && (
+                          <div>
+                            <Label className="text-xs text-muted-foreground uppercase">Options</Label>
+                            <ul className="list-disc pl-5 space-y-1 mt-1 text-sm">
+                              {q.options.map((opt: any, i: number) => (
+                                <li key={i} className={i === q.correctOptionIndex ? "font-semibold text-green-600" : ""}>
+                                  {opt.text} {i === q.correctOptionIndex && "✓"}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {aiType === "CODING" && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                            {q.sampleInput && (
+                              <div>
+                                <Label className="text-xs text-muted-foreground uppercase">Sample Input</Label>
+                                <pre className="mt-1 bg-muted p-2 rounded-md overflow-x-auto text-xs">{q.sampleInput}</pre>
+                              </div>
+                            )}
+                            {q.sampleOutput && (
+                              <div>
+                                <Label className="text-xs text-muted-foreground uppercase">Sample Output</Label>
+                                <pre className="mt-1 bg-muted p-2 rounded-md overflow-x-auto text-xs">{q.sampleOutput}</pre>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
+                        {q.explanation && (
+                          <div>
+                            <Label className="text-xs text-muted-foreground uppercase">Explanation</Label>
+                            <p className="text-sm mt-1 text-muted-foreground">{q.explanation}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {questionType !== 'ai' && (
+              <div className="flex gap-2 justify-end mt-4">
+                <Button variant="outline" onClick={() => setAddingNew(false)} data-testid="button-cancel-add">Cancel</Button>
+                <Button onClick={handleAddQuestion} disabled={!qText.trim() || !qTitle.trim()} data-testid="button-save-question">Add Question</Button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -5,6 +5,7 @@ import type {
   CreateMcqQuestionBody,
   CreateCodingQuestionBody,
   UpdateQuestionBody,
+  GenerateAiQuestionsBody,
 } from "./questions.schemas";
 import { HttpError } from "../../shared/errors/http-error";
 
@@ -118,6 +119,107 @@ export async function getQuestionUsage(app: FastifyInstance, id: string) {
     ),
     totalUsage: usage.length,
   };
+}
+
+export async function generateAiQuestions(data: GenerateAiQuestionsBody) {
+  const { topic, difficulty, type, count } = data;
+  
+  const systemPrompt = `You are an expert exam question generator. 
+Generate ${count} ${type === "MCQ" ? "multiple choice" : "coding"} question(s) about "${topic}" at difficulty level ${difficulty} out of 5.
+Return ONLY a valid JSON object containing a "questions" array.
+CRITICAL: Ensure your JSON is perfectly formatted. Do not forget colons after property names (e.g., use "prompt": "..." instead of "prompt " ...).
+
+${type === "MCQ" ? `
+The JSON object must have exactly this structure:
+{
+  "questions": [
+    {
+      "title": "Short title",
+      "prompt": "The question text",
+      "explanation": "General explanation (optional)",
+      "difficulty": ${difficulty},
+      "marks": 5,
+      "options": [
+        { "text": "Option A" },
+        { "text": "Option B" },
+        { "text": "Option C" },
+        { "text": "Option D" }
+      ],
+      "correctOptionIndex": 0,
+      "answerExplanation": "Why this is correct"
+    }
+  ]
+}
+` : `
+The JSON object must have exactly this structure:
+{
+  "questions": [
+    {
+      "title": "Short title",
+      "prompt": "The question text",
+      "explanation": "General explanation",
+      "difficulty": ${difficulty},
+      "marks": 10,
+      "starterCode": "function solve() {}",
+      "sampleInput": "2 3",
+      "sampleOutput": "5",
+      "testCases": [
+        { "input": "2 3", "expectedOutput": "5", "isHidden": false },
+        { "input": "4 5", "expectedOutput": "9", "isHidden": true }
+      ]
+    }
+  ]
+}
+`}
+`;
+
+  try {
+    const apiUrl = process.env.LLM_API_URL || "https://openrouter.ai/api/v1/chat/completions";
+    const apiKey = process.env.OPENROUTER_API_KEY || "";
+    
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: process.env.LLM_MODEL || "nvidia/nemotron-3-ultra-550b-a55b:free",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Please generate the ${count} questions now based on the system instructions.` }
+        ],
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`LLM API returned ${response.status}`);
+    }
+
+    const result = (await response.json()) as any;
+    const content = result.choices?.[0]?.message?.content;
+    
+    if (!content) {
+      throw new Error("No content generated");
+    }
+
+    // Try to parse JSON out of the response (sometimes it's wrapped in backticks)
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("Failed to parse JSON object from LLM response");
+    }
+
+    let jsonStr = jsonMatch[0];
+    
+    // Fix common missing colon hallucination from some local models (e.g., "prompt "You" -> "prompt": "You")
+    jsonStr = jsonStr.replace(/"([^"]+)"\s+"/g, '"$1": "');
+
+    const parsed = JSON.parse(jsonStr);
+    return parsed.questions || [];
+  } catch (error: any) {
+    throw new HttpError(500, `Failed to generate AI questions: ${error.message}`);
+  }
 }
 
 type QuestionWithSubtype = {

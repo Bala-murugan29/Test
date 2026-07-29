@@ -7,6 +7,7 @@ import QuestionBankPage from './QuestionBankPage';
 import StudentManagementPage from './StudentManagementPage';
 import ReportsPage from './ReportsPage';
 import AnalyticsDashboard from './AnalyticsDashboard';
+import { AIQuestionGeneratorPage } from './AIQuestionGeneratorPage';
 
 export default function FacultyLayout() {
   return (
@@ -49,6 +50,11 @@ export default function FacultyLayout() {
       <Route path="/faculty/analytics">
         <ProtectedRoute allowedRoles={['faculty']}>
           <AnalyticsDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/faculty/ai-generator">
+        <ProtectedRoute allowedRoles={['faculty']}>
+          <AIQuestionGeneratorPage />
         </ProtectedRoute>
       </Route>
     </Switch>

@@ -6,6 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './aiQuestionGenRequest';
+export * from './aiQuestionGenRequestType';
+export * from './aiQuestionGenResponse';
+export * from './aiQuestionGenResponseItem';
 export * from './assignRoleRequest';
 export * from './assignRoleRequestRole';
 export * from './authResponse';

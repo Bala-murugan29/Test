@@ -139,12 +139,19 @@ async function main() {
   // 5. Create demo users
   const hashes = await Promise.all([
     bcrypt.hash("Balamru29$", SALT_ROUNDS),
+    bcrypt.hash("Password123!", SALT_ROUNDS),
   ]);
 
   const adminUser = await prisma.user.upsert({
     where: { email: "r.balamurugan2910@gmail.com" },
     update: {},
     create: { email: "r.balamurugan2910@gmail.com", passwordHash: hashes[0], fullName: "Balamurugan", status: "ACTIVE" },
+  });
+
+  const facultyUser = await prisma.user.upsert({
+    where: { email: "faculty@example.com" },
+    update: {},
+    create: { email: "faculty@example.com", passwordHash: hashes[1], fullName: "Test Faculty", status: "ACTIVE" },
   });
 
   console.log("Users created");
@@ -156,6 +163,12 @@ async function main() {
     create: { userId: adminUser.id, roleId: adminRole.id },
   });
 
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: facultyUser.id, roleId: facultyRole.id } },
+    update: {},
+    create: { userId: facultyUser.id, roleId: facultyRole.id },
+  });
+
   console.log("Roles assigned to users");
 
   // 7. Create FacultyProfile for admin user
@@ -165,8 +178,20 @@ async function main() {
     create: {
       userId: adminUser.id,
       departmentId: csDept.id,
-      employeeNumber: "ADM001",
+      employeeNumber: `ADM-${Date.now()}`,
       designation: "Senior Administrator",
+    },
+  });
+
+  // Create FacultyProfile for the new faculty user
+  await prisma.facultyProfile.upsert({
+    where: { userId: facultyUser.id },
+    update: {},
+    create: {
+      userId: facultyUser.id,
+      departmentId: csDept.id,
+      employeeNumber: `FAC-${Date.now()}`,
+      designation: "Assistant Professor",
     },
   });
 

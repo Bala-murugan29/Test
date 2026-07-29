@@ -3,7 +3,7 @@ import { Link, useLocation } from 'wouter';
 import {
   LayoutDashboard, BookOpen, BarChart3, Users, FileText,
   TrendingUp, Library, Building2, Settings, ChevronLeft,
-  ChevronRight, GraduationCap,
+  ChevronRight, GraduationCap, BrainCircuit
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/utils/cn';
@@ -24,6 +24,7 @@ const facultyNav: NavItem[] = [
   { label: 'Dashboard', href: '/faculty/dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
   { label: 'My Exams', href: '/faculty/exams/list', icon: <BookOpen className="w-5 h-5" /> },
   { label: 'Problem Sets', href: '/faculty/exams/exam001/questions', icon: <Library className="w-5 h-5" /> },
+  { label: 'AI Generator', href: '/faculty/ai-generator', icon: <BrainCircuit className="w-5 h-5" /> },
   { label: 'Students', href: '/faculty/students', icon: <Users className="w-5 h-5" /> },
   { label: 'Reports', href: '/faculty/reports', icon: <FileText className="w-5 h-5" /> },
   { label: 'Analytics', href: '/faculty/analytics', icon: <TrendingUp className="w-5 h-5" /> },

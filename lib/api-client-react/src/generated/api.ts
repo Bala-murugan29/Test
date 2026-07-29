@@ -20,6 +20,8 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AiQuestionGenRequest,
+  AiQuestionGenResponse,
   AssignRoleRequest,
   AuthResponse,
   ChangePasswordRequest,
@@ -1238,5 +1240,76 @@ export const useRemoveRole = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getRemoveRoleMutationOptions(options));
+    }
+
+export const getGenerateAiQuestionsUrl = () => {
+
+
+
+
+  return `/api/questions/generate-ai`
+}
+
+/**
+ * Hit the local AI model to generate questions
+ * @summary Generate questions using AI
+ */
+export const generateAiQuestions = async (aiQuestionGenRequest: AiQuestionGenRequest, options?: RequestInit): Promise<AiQuestionGenResponse> => {
+
+  return customFetch<AiQuestionGenResponse>(getGenerateAiQuestionsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(aiQuestionGenRequest)
+  }
+);}
+
+
+
+
+export const getGenerateAiQuestionsMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateAiQuestions>>, TError,{data: BodyType<AiQuestionGenRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateAiQuestions>>, TError,{data: BodyType<AiQuestionGenRequest>}, TContext> => {
+
+const mutationKey = ['generateAiQuestions'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateAiQuestions>>, {data: BodyType<AiQuestionGenRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  generateAiQuestions(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateAiQuestionsMutationResult = NonNullable<Awaited<ReturnType<typeof generateAiQuestions>>>
+    export type GenerateAiQuestionsMutationBody = BodyType<AiQuestionGenRequest>
+    export type GenerateAiQuestionsMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Generate questions using AI
+ */
+export const useGenerateAiQuestions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateAiQuestions>>, TError,{data: BodyType<AiQuestionGenRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateAiQuestions>>,
+        TError,
+        {data: BodyType<AiQuestionGenRequest>},
+        TContext
+      > => {
+      return useMutation(getGenerateAiQuestionsMutationOptions(options));
     }
 

@@ -66,6 +66,13 @@ const updateQuestionStatusBodySchema = z.object({
   status: z.enum(["DRAFT", "REVIEW", "PUBLISHED", "ARCHIVED"]),
 });
 
+const generateAiQuestionsBodySchema = z.object({
+  topic: z.string().min(1).max(200),
+  difficulty: z.number().int().min(1).max(5),
+  type: z.enum(["MCQ", "CODING"]),
+  count: z.number().int().min(1).max(10).default(1),
+});
+
 const questionResponseSchema = z.object({
   id: z.string().uuid(),
   departmentId: z.string().uuid(),
@@ -124,6 +131,7 @@ export type CreateMcqQuestionBody = z.infer<typeof createMcqQuestionBodySchema>;
 export type CreateCodingQuestionBody = z.infer<typeof createCodingQuestionBodySchema>;
 export type UpdateQuestionBody = z.infer<typeof updateQuestionBodySchema>;
 export type UpdateQuestionStatusBody = z.infer<typeof updateQuestionStatusBodySchema>;
+export type GenerateAiQuestionsBody = z.infer<typeof generateAiQuestionsBodySchema>;
 export type QuestionResponse = z.infer<typeof questionResponseSchema>;
 export type PaginatedQuestions = z.infer<typeof paginatedQuestionsSchema>;
 
@@ -133,6 +141,7 @@ export {
   createCodingQuestionBodySchema,
   updateQuestionBodySchema,
   updateQuestionStatusBodySchema,
+  generateAiQuestionsBodySchema,
   questionResponseSchema,
   paginatedQuestionsSchema,
 };

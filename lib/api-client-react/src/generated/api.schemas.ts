@@ -168,6 +168,34 @@ export interface UserRoleResponse {
   assignedAt: string;
 }
 
+export type AiQuestionGenRequestType = typeof AiQuestionGenRequestType[keyof typeof AiQuestionGenRequestType];
+
+
+export const AiQuestionGenRequestType = {
+  MCQ: 'MCQ',
+  CODING: 'CODING',
+} as const;
+
+export interface AiQuestionGenRequest {
+  /** @minLength 1 */
+  topic: string;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  difficulty: number;
+  type: AiQuestionGenRequestType;
+  /**
+     * @minimum 1
+     * @maximum 10
+     */
+  count?: number;
+}
+
+export type AiQuestionGenResponseItem = { [key: string]: unknown };
+
+export type AiQuestionGenResponse = AiQuestionGenResponseItem[];
+
 export type ListUsersParams = {
 page?: number;
 limit?: number;

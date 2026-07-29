@@ -8,6 +8,7 @@ import {
   updateQuestionStatusController,
   deleteQuestionController,
   getQuestionUsageController,
+  generateAiQuestionsController,
 } from "./questions.controller";
 
 const questionResponseSchema = {
@@ -86,6 +87,34 @@ const jwtPreHandler = async (req: { jwtVerify: () => Promise<void> }) => {
 
 export const questionsRoutes: FastifyPluginAsync = async (app) => {
   app.addHook("preHandler", jwtPreHandler);
+
+  app.post("/questions/generate-ai", {
+    schema: {
+      tags: ["questions"],
+      summary: "Generate questions using AI",
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: "object",
+        required: ["topic", "difficulty", "type"],
+        properties: {
+          topic: { type: "string", minLength: 1 },
+          difficulty: { type: "integer", minimum: 1, maximum: 5 },
+          type: { type: "string", enum: ["MCQ", "CODING"] },
+          count: { type: "integer", minimum: 1, maximum: 10, default: 1 },
+        },
+      },
+      response: {
+        200: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: true,
+          }
+        },
+      },
+    },
+    handler: generateAiQuestionsController,
+  });
 
   app.get("/questions", {
     schema: {

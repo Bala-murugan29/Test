@@ -434,6 +434,35 @@ paths:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
 
+  /questions/generate-ai:
+    post:
+      operationId: generateAiQuestions
+      tags: [questions]
+      summary: Generate questions using AI
+      description: Hit the local AI model to generate questions
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+            
+              $ref: "#/components/schemas/AiQuestionGenRequest"
+      responses:
+        "200":
+          description: Generated questions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiQuestionGenResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -635,3 +664,30 @@ components:
           type: string
         assignedAt:
           type: string
+
+    AiQuestionGenRequest:
+      type: object
+      required: [topic, difficulty, type]
+      properties:
+        topic:
+          type: string
+          minLength: 1
+        difficulty:
+          type: integer
+          minimum: 1
+          maximum: 5
+        type:
+          type: string
+          enum: [MCQ, CODING]
+        count:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 1
+
+    AiQuestionGenResponse:
+      type: array
+      items:
+        type: object
+        additionalProperties: true
+

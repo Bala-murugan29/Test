@@ -5,6 +5,7 @@ import {
   createCodingQuestionBodySchema,
   updateQuestionBodySchema,
   updateQuestionStatusBodySchema,
+  generateAiQuestionsBodySchema,
   questionResponseSchema,
   paginatedQuestionsSchema,
 } from "./questions.schemas";
@@ -105,5 +106,14 @@ export async function getQuestionUsageController(
 ) {
   const { id } = request.params as { id: string };
   const result = await questionsService.getQuestionUsage(request.server, id);
+  return reply.code(200).send(result);
+}
+
+export async function generateAiQuestionsController(
+  request: FastifyRequest,
+  reply: FastifyReply,
+) {
+  const body = generateAiQuestionsBodySchema.parse(request.body);
+  const result = await questionsService.generateAiQuestions(body);
   return reply.code(200).send(result);
 }

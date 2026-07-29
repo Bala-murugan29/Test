@@ -43,6 +43,7 @@ services:
       LOG_LEVEL: info
       RATE_LIMIT_MAX: 100
       RATE_LIMIT_WINDOW_MS: 60000
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
     ports:
       - "5000:5000"
     depends_on:

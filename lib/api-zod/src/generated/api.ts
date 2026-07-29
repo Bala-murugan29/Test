@@ -323,3 +323,26 @@ export const RemoveRoleResponse = zod.object({
 })
 
 
+/**
+ * Hit the local AI model to generate questions
+ * @summary Generate questions using AI
+ */
+
+export const generateAiQuestionsBodyDifficultyMax = 5;
+
+export const generateAiQuestionsBodyCountDefault = 1;
+export const generateAiQuestionsBodyCountMax = 10;
+
+
+
+export const GenerateAiQuestionsBody = zod.object({
+  "topic": zod.string().min(1),
+  "difficulty": zod.number().min(1).max(generateAiQuestionsBodyDifficultyMax),
+  "type": zod.enum(['MCQ', 'CODING']),
+  "count": zod.number().min(1).max(generateAiQuestionsBodyCountMax).default(generateAiQuestionsBodyCountDefault)
+})
+
+export const GenerateAiQuestionsResponseItem = zod.record(zod.string(), zod.unknown())
+export const GenerateAiQuestionsResponse = zod.array(GenerateAiQuestionsResponseItem)
+
+
