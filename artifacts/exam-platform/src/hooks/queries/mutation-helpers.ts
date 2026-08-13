@@ -9,7 +9,8 @@ export function notifySuccess(title: string, description?: string) {
 /** Show an error toast from any thrown error. */
 export function notifyError(err: unknown, title = 'Operation failed') {
   const apiErr = toApiError(err);
-  toast({ variant: 'destructive', title, description: apiErr.message });
+  const toastTitle = apiErr.status === 429 ? 'Too many requests' : title;
+  toast({ variant: 'destructive', title: toastTitle, description: apiErr.message });
 }
 
 /** Generic on-success/on-error pair for mutations. */

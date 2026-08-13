@@ -16,7 +16,9 @@ import type {
 import { LANGUAGE_LABELS } from '@/types/coding.types';
 import type { Exam } from '@/types';
 import { cn } from '@/utils/cn';
+import { getErrorMessage } from '@/utils/error-message';
 import { useAntiCheat } from '@/hooks/useAntiCheat';
+import { useToast } from '@/hooks/use-toast';
 
 type PanelTab = 'problem' | 'testcases' | 'output';
 type RunState = 'idle' | 'running' | 'done';
@@ -66,6 +68,7 @@ function simulateSubmit(problem: CodingProblem, language: Language, code: string
 export default function CodingExamScreen() {
   const { examId } = useParams<{ examId: string }>();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
   const [exam, setExam] = useState<Exam | null>(null);
   const [problems, setProblems] = useState<CodingProblem[]>([]);
@@ -107,13 +110,24 @@ export default function CodingExamScreen() {
       setExam(e);
       setTimeLeft((e?.durationMinutes ?? 60) * 60);
 
-      // Try to load real questions from backend
       let loadedProblems: CodingProblem[] = [];
       try {
         const questions = await examService.getExamQuestions(examId);
-        loadedProblems = questions
-          .filter((q) => q.type === 'coding')
-          .map((q, idx) => {
+        const codingQuestions = questions.filter((q) => q.type === 'coding');
+        const mcqQuestions = questions.filter((q) => q.type !== 'coding');
+
+        // MCQ-only exams belong on the standard exam screen, not here.
+        if (codingQuestions.length === 0) {
+          if (mcqQuestions.length > 0) {
+            setLocation(`/student/exams/${examId}/take`, { replace: true });
+            return;
+          }
+          setProblems([]);
+          setLoading(false);
+          return;
+        }
+
+        loadedProblems = codingQuestions.map((q, idx) => {
             const starter: StarterCode = {
               c: '#include <stdio.h>\n\nint main() {\n    // Write your solution here\n    return 0;\n}',
               cpp: '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    // Write your solution here\n    return 0;\n}',
@@ -153,12 +167,9 @@ export default function CodingExamScreen() {
             } as CodingProblem;
           });
       } catch {
-        // If loading fails, fall through to fallback
-      }
-
-      // Fall back to hardcoded problems if no real coding questions found
-      if (loadedProblems.length === 0) {
-        loadedProblems = getFallbackProblems(examId);
+        setProblems([]);
+        setLoading(false);
+        return;
       }
 
       setProblems(loadedProblems);
@@ -183,7 +194,7 @@ export default function CodingExamScreen() {
     }).catch(() => {
       setLoading(false);
     });
-  }, [examId]);
+  }, [examId, storeExamId, setLocation]);
 
   useEffect(() => {
     if (!exam || timeLeft <= 0) return;
@@ -206,7 +217,7 @@ export default function CodingExamScreen() {
     return () => window.removeEventListener('beforeunload', handler);
   }, []);
 
-  const { isFullScreen, requestFullScreen } = useAntiCheat({
+  const { isFullScreen, isExtensionSpoofing, requestFullScreen } = useAntiCheat({
     onAutoSubmit: () => {
       handleConfirmFinish();
     },
@@ -252,8 +263,8 @@ export default function CodingExamScreen() {
             stderr: response.stderr ?? undefined,
           },
         ]);
-      } catch (err: any) {
-        const errorMsg = err.response?.data?.message || err.message || 'Execution error';
+      } catch (err: unknown) {
+        const errorMsg = getErrorMessage(err, 'Execution error');
         setRunResults([
           {
             testCaseId: 'custom',
@@ -297,8 +308,8 @@ export default function CodingExamScreen() {
           stderr: response.stderr ?? undefined,
           isHidden: false,
         });
-      } catch (err: any) {
-        const errorMsg = err.response?.data?.message || err.message || 'Execution error';
+      } catch (err: unknown) {
+        const errorMsg = getErrorMessage(err, 'Execution error');
         results.push({
           testCaseId: tc.id,
           input: tc.input,
@@ -354,14 +365,14 @@ export default function CodingExamScreen() {
           stderr: response.stderr ?? undefined,
           isHidden: tc.isHidden,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         results.push({
           testCaseId: tc.id,
           input: tc.input,
           expectedOutput: tc.expectedOutput,
           actualOutput: '',
           passed: false,
-          stderr: err.response?.data?.message || err.message || 'Execution error',
+          stderr: getErrorMessage(err, 'Execution error'),
           isHidden: tc.isHidden,
         });
       }
@@ -444,7 +455,11 @@ export default function CodingExamScreen() {
       setLocation(`/student/exams/${examId}/result`, { replace: true });
     } catch (err) {
       console.error('Failed to submit exam:', err);
-      alert(`Failed to submit exam: ${err instanceof Error ? err.message : 'Please try again.'}`);
+      toast({
+        title: 'Submission failed',
+        description: getErrorMessage(err, 'Please try again.'),
+        variant: 'destructive',
+      });
       setFinishingExam(false);
       setConfirmFinish(false);
     }
@@ -460,7 +475,35 @@ export default function CodingExamScreen() {
 
   const submittedCount = Object.keys(submissions).length;
 
-  if (loading || !problem || !exam) {
+  if (loading || !exam) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading exam...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (problems.length === 0) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background p-6">
+        <div className="text-center max-w-md">
+          <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-2">No Coding Questions</h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            This exam does not contain any coding problems. Return to the instructions and try again.
+          </p>
+          <Button onClick={() => setLocation(`/student/exams/${examId}/instructions`)}>
+            Back to Instructions
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!problem) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
@@ -472,6 +515,21 @@ export default function CodingExamScreen() {
   }
 
   const isUrgent = timeLeft <= 300;
+
+  if (isExtensionSpoofing) {
+    return (
+      <div className="fixed inset-0 z-[99999] bg-background text-foreground flex flex-col items-center justify-center p-6 text-center">
+        <AlertTriangle className="w-16 h-16 text-destructive mb-6" />
+        <h2 className="text-2xl font-bold mb-2">Anti-Cheat Violation</h2>
+        <p className="text-muted-foreground max-w-md mb-8">
+          We detected an extension or script that modifies browser visibility (e.g., "Always Active Window"). Please disable it to enter the exam.
+        </p>
+        <Button size="lg" onClick={() => window.location.reload()}>
+          Reload Page
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden" data-testid="coding-exam-screen">
@@ -898,32 +956,4 @@ function ProblemDescription({ problem }: { problem: CodingProblem }) {
       </div>
     </div>
   );
-}
-
-function getFallbackProblems(examId: string): CodingProblem[] {
-  const starter: StarterCode = {
-    c: '#include <stdio.h>\n\nint main() {\n    // Write your solution here\n    return 0;\n}',
-    cpp: '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    // Write your solution here\n    return 0;\n}',
-    python: '# Write your solution here\n',
-    java: 'import java.util.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        // Write your solution here\n    }\n}',
-  };
-  return [
-    {
-      id: `fp_${examId}_1`,
-      examId,
-      order: 1,
-      title: 'Hello World',
-      difficulty: 'easy',
-      marks: 10,
-      timeLimit: '1s',
-      memoryLimit: '64 MB',
-      description: 'Print "Hello, World!" to the standard output.',
-      inputFormat: 'No input.',
-      outputFormat: 'Print exactly: Hello, World!',
-      constraints: [],
-      examples: [{ id: 'ex1', input: '', expectedOutput: 'Hello, World!' }],
-      hiddenTests: [],
-      starterCode: starter,
-    },
-  ];
 }

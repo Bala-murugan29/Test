@@ -3,6 +3,7 @@ import axios, {
   type AxiosRequestConfig,
   type InternalAxiosRequestConfig,
 } from 'axios';
+import { getErrorMessage } from '@/utils/error-message';
 import { tokenStorage } from './token-storage';
 
 /**
@@ -34,16 +35,12 @@ export interface ApiErrorResponse {
   details?: unknown;
 }
 
-/** Pull a human-readable message out of any error (axios or thrown). */
+/** Pull a human-readable message out of any error (axios, fetch client, or thrown). */
 export function toApiError(err: unknown): ApiErrorResponse {
   if (axios.isAxiosError(err)) {
     const axiosErr = err as AxiosError<{ error?: string; message?: string; requestId?: string }>;
     const data = axiosErr.response?.data;
-    const message =
-      data?.error ||
-      data?.message ||
-      axiosErr.message ||
-      'Something went wrong. Please try again.';
+    const message = getErrorMessage(err);
     return {
       message,
       status: axiosErr.response?.status ?? 0,
@@ -51,10 +48,21 @@ export function toApiError(err: unknown): ApiErrorResponse {
       details: data,
     };
   }
-  if (err instanceof Error) {
-    return { message: err.message, status: 0 };
+
+  if (err instanceof Error && err.name === 'ApiError' && 'status' in err) {
+    const fetchErr = err as Error & { status: number; data?: unknown };
+    return {
+      message: getErrorMessage(err),
+      status: fetchErr.status,
+      details: fetchErr.data,
+    };
   }
-  return { message: 'An unexpected error occurred.', status: 0 };
+
+  if (err instanceof Error) {
+    return { message: getErrorMessage(err), status: 0, details: undefined };
+  }
+
+  return { message: getErrorMessage(err), status: 0 };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -195,4 +203,44 @@ export async function apiPut<T>(
 export async function apiDelete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
   const res = await api.delete<T>(url, config);
   return res.data;
+}
+
+function parseFilenameFromContentDisposition(header: string | undefined): string | undefined {
+  if (!header) return undefined;
+  const match = header.match(/filename="?([^";]+)"?/i);
+  return match?.[1];
+}
+
+function getHeaderValue(value: unknown): string | undefined {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && typeof value[0] === 'string') return value[0];
+  return undefined;
+}
+
+/** Download a file from the API (CSV, etc.) with auth headers attached. */
+export async function apiDownload(
+  url: string,
+  fallbackFilename: string,
+  config?: AxiosRequestConfig,
+): Promise<void> {
+  const res = await api.get<Blob>(url, { ...config, responseType: 'blob' });
+  const filename =
+    parseFilenameFromContentDisposition(getHeaderValue(res.headers['content-disposition'])) ??
+    fallbackFilename;
+
+  const blob =
+    res.data instanceof Blob
+      ? res.data
+      : new Blob([res.data], {
+          type: getHeaderValue(res.headers['content-type']) ?? 'text/csv',
+        });
+
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
 }

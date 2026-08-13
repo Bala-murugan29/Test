@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -31,19 +31,12 @@ services:
     build:
       context: ../..
       dockerfile: artifacts/api-server/Dockerfile
+    env_file:
+      - ../../.env.docker
     environment:
-      NODE_ENV: production
-      PORT: 5000
       HOST: 0.0.0.0
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/app
       REDIS_URL: redis://redis:6379
-      JWT_ACCESS_SECRET: replace-me-access
-      JWT_REFRESH_SECRET: replace-me-refresh
-      CORS_ORIGIN: "*"
-      LOG_LEVEL: info
-      RATE_LIMIT_MAX: 100
-      RATE_LIMIT_WINDOW_MS: 60000
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
     ports:
       - "5000:5000"
     depends_on:
@@ -56,6 +49,8 @@ services:
     build:
       context: ../..
       dockerfile: artifacts/exam-platform/Dockerfile
+      args:
+        VITE_API_URL: /api
     ports:
       - "80:80"
     depends_on:

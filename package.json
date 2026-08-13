@@ -4,6 +4,9 @@
   "license": "MIT",
   "scripts": {
     "dev": "node ./scripts/dev.mjs",
+    "lan": "node ./scripts/lan.mjs",
+    "lan:dev": "node ./scripts/lan.mjs --dev",
+    "lan:docker": "node ./scripts/lan.mjs --docker",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"

@@ -9,9 +9,11 @@ RUN corepack enable && corepack pnpm config set fetch-timeout 600000 && corepack
 
 FROM deps AS build
 WORKDIR /repo/artifacts/exam-platform
+ARG VITE_API_URL=/api
 ENV NODE_ENV=production
 ENV PORT=5000
 ENV BASE_PATH=/
+ENV VITE_API_URL=${VITE_API_URL}
 RUN corepack pnpm run build
 
 FROM nginx:alpine AS runtime

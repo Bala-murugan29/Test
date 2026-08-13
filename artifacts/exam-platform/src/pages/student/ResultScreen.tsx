@@ -26,13 +26,15 @@ export default function ResultScreen() {
     if (!examId || !user) return;
     const load = async () => {
       try {
-        const [allResults, e] = await Promise.all([
+        const [allResults, e, q] = await Promise.all([
           resultService.getStudentResults(user.id),
           examService.getExamById(examId),
+          examService.getExamQuestions(examId),
         ]);
-        const r = allResults.find((x) => x.examId === examId) ?? allResults[0] ?? null;
+        const r = allResults.find((x) => x.examId === examId) ?? null;
         setResult(r);
         setExam(e);
+        setQuestions(q);
         if (!r) setNotFound(true);
       } catch {
         setNotFound(true);

@@ -8,19 +8,24 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Button } from '@/components/ui/button';
 import { resultService } from '@/services/result.service';
+import { reportService } from '@/services/report.service';
 import { examService } from '@/services/exam.service';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
+import { notifyError } from '@/hooks/queries/mutation-helpers';
 import { ExamResult, Exam } from '@/types';
 import { formatDateTime, formatPercentage } from '@/utils/format';
 import { ExamPerformance } from '@/types';
 
 export default function ReportsPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [exams, setExams] = useState<Exam[]>([]);
   const [selectedExamId, setSelectedExamId] = useState<string>('');
   const [results, setResults] = useState<ExamResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingResults, setLoadingResults] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -54,14 +59,36 @@ export default function ReportsPage() {
     },
   ];
 
+  const handleExportCsv = async () => {
+    if (!selectedExamId || !selectedExam) return;
+    setExporting(true);
+    try {
+      await reportService.downloadExamResultsCsv(selectedExamId, selectedExam.title);
+      toast({
+        title: 'CSV downloaded',
+        description: `Exported results for ${selectedExam.title}.`,
+      });
+    } catch (err) {
+      notifyError(err, 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <DashboardLayout breadcrumbs={['Faculty', 'Reports']}>
       <PageHeader
         title="Exam Reports"
         subtitle="Detailed analytics for each exam"
         actions={
-          <Button variant="outline" onClick={() => alert('CSV export — demo only')} data-testid="button-export-csv">
-            <Download className="w-4 h-4 mr-1.5" /> Export CSV
+          <Button
+            variant="outline"
+            onClick={handleExportCsv}
+            disabled={!selectedExamId || results.length === 0 || exporting}
+            data-testid="button-export-csv"
+          >
+            <Download className="w-4 h-4 mr-1.5" />
+            {exporting ? 'Exporting...' : 'Export CSV'}
           </Button>
         }
       />
@@ -137,7 +164,9 @@ export default function ReportsPage() {
                         .map((r, i) => (
                           <tr key={r.id} className="border-b border-card-border last:border-0">
                             <td className="px-3 py-2.5 text-muted-foreground font-medium">#{i + 1}</td>
-                            <td className="px-3 py-2.5 text-foreground font-medium">{r.studentName}</td>
+                            <td className="px-3 py-2.5 text-foreground font-medium">
+                              {r.studentName || r.studentId || 'Unknown Student'}
+                            </td>
                             <td className="px-3 py-2.5">
                               <span className={`font-semibold ${r.isPassed ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
                                 {formatPercentage(r.percentage)}

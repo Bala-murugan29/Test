@@ -7,6 +7,7 @@ import { SearchInput } from '@/components/common/SearchInput';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EmptyState } from '@/components/common/EmptyState';
 import { useDebounce } from '@/hooks/useDebounce';
+import { apiGet } from '@/lib/axios';
 
 interface StudentRecord {
   id: string;
@@ -23,6 +24,29 @@ interface StudentRecord {
   enrolledAt: string;
 }
 
+interface BackendStudent {
+  userId: string;
+  studentNumber: string;
+  admissionYear: number;
+  currentSemester: number;
+  gpa: number | null;
+  createdAt: string;
+  user: {
+    id: string;
+    email: string;
+    fullName: string;
+    status: string;
+  };
+  department: {
+    name: string;
+  };
+}
+
+interface Paginated<T> {
+  data: T[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
+}
+
 const DEPARTMENTS = ['All', 'Computer Science', 'Electronics', 'Mechanical', 'Civil', 'Information Technology'];
 
 export default function StudentManagementPage() {
@@ -33,8 +57,33 @@ export default function StudentManagementPage() {
   const debouncedSearch = useDebounce(search, 300);
 
   useEffect(() => {
-    // TODO: wire to real API
-    setLoading(false);
+    const load = async () => {
+      setLoading(true);
+      try {
+        const res = await apiGet<Paginated<BackendStudent>>('/students', { params: { page: 1, limit: 100 } });
+        setRecords(
+          res.data.map((s) => ({
+            id: s.userId,
+            rollNumber: s.studentNumber,
+            name: s.user.fullName,
+            email: s.user.email,
+            department: s.department.name,
+            year: s.currentSemester,
+            cgpa: s.gpa ?? 0,
+            examsTaken: 0,
+            examsCleared: 0,
+            avgScore: 0,
+            status: s.user.status === 'ACTIVE' ? 'active' : 'suspended',
+            enrolledAt: s.createdAt,
+          })),
+        );
+      } catch {
+        setRecords([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, []);
 
   const filtered = records.filter((s) => {

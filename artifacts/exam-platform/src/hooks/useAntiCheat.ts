@@ -11,6 +11,21 @@ export function useAntiCheat({ onAutoSubmit, maxViolations = 3 }: UseAntiCheatOp
   const [isFullScreen, setIsFullScreen] = useState(
     typeof document !== 'undefined' ? !!document.fullscreenElement : true
   );
+
+  const [isExtensionSpoofing] = useState(() => {
+    if (typeof document === 'undefined') return false;
+    try {
+      const hasHiddenSpoofed = Object.getOwnPropertyDescriptor(document, 'hidden') !== undefined;
+      const hasVisibilityStateSpoofed = Object.getOwnPropertyDescriptor(document, 'visibilityState') !== undefined;
+      const isHasFocusSpoofed = Object.getOwnPropertyDescriptor(document, 'hasFocus') !== undefined;
+      const hasFocusNative = document.hasFocus ? document.hasFocus.toString().includes('[native code]') : true;
+      
+      return hasHiddenSpoofed || hasVisibilityStateSpoofed || isHasFocusSpoofed || !hasFocusNative;
+    } catch (e) {
+      return false;
+    }
+  });
+
   const { toast } = useToast();
   
   const onAutoSubmitRef = useRef(onAutoSubmit);
@@ -178,7 +193,7 @@ export function useAntiCheat({ onAutoSubmit, maxViolations = 3 }: UseAntiCheatOp
     };
   }, [handleViolation]);
 
-  return { violations, isFullScreen, requestFullScreen: () => {
+  return { violations, isFullScreen, isExtensionSpoofing, requestFullScreen: () => {
     if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
       document.documentElement.requestFullscreen().catch(err => console.warn(err));
     }

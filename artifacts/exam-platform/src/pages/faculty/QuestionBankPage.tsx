@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'wouter';
-import { Plus, Pencil, Trash2, Library, Code, List, Sparkles } from 'lucide-react';
+import { Plus, Pencil, Trash2, Library, Code, List, Sparkles, Upload } from 'lucide-react';
+import Papa from 'papaparse';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
@@ -16,6 +17,8 @@ import { Exam, Question } from '@/types';
 import { cn } from '@/utils/cn';
 import { useToast } from '@/hooks/use-toast';
 import { useGenerateAiQuestions } from '@workspace/api-client-react';
+import { notifyError } from '@/hooks/queries/mutation-helpers';
+import { getErrorMessage } from '@/utils/error-message';
 
 export default function QuestionBankPage() {
   const { examId } = useParams<{ examId: string }>();
@@ -25,6 +28,8 @@ export default function QuestionBankPage() {
   const [addingNew, setAddingNew] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [departmentId, setDepartmentId] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   // Form states
   const [questionType, setQuestionType] = useState<'mcq' | 'coding' | 'ai'>('mcq');
@@ -61,11 +66,7 @@ export default function QuestionBankPage() {
         });
       },
       onError: (error) => {
-        toast({
-          title: "Generation failed",
-          description: error.message || "Could not generate questions.",
-          variant: "destructive",
-        });
+        notifyError(error, "Generation failed");
       },
     },
   });
@@ -180,8 +181,123 @@ export default function QuestionBankPage() {
       loadQuestions();
     } catch (err: any) {
       console.error(err);
-      toast({ title: "Failed to add question", description: err.message || "Something went wrong", variant: "destructive" });
+      toast({ title: "Failed to add question", description: getErrorMessage(err), variant: "destructive" });
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      skipEmptyLines: true,
+      transform: (value) => (typeof value === 'string' ? value.trim() : value),
+      complete: async (results) => {
+        const rows = (results.data as string[][]).map((row) =>
+          row.map((cell) => (typeof cell === 'string' ? cell.trim() : String(cell ?? '').trim())),
+        );
+        setIsImporting(true);
+        let targetDeptId = departmentId;
+
+        if (!targetDeptId) {
+          try {
+            const depts = await apiGet<any>('/departments', { params: { page: 1, limit: 1 } });
+            if (depts.data && depts.data.length > 0) {
+              targetDeptId = depts.data[0].id;
+              setDepartmentId(targetDeptId);
+            }
+          } catch (err) {
+            console.error(err);
+          }
+        }
+
+        if (!targetDeptId) {
+          toast({ title: "Error", description: "Department not found", variant: "destructive" });
+          setIsImporting(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          return;
+        }
+
+        if (!examId) {
+          toast({ title: "Error", description: "Exam not found", variant: "destructive" });
+          setIsImporting(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          return;
+        }
+
+        try {
+          const existingQuestions = await examService.getExamQuestions(examId);
+          let nextSequenceNo = existingQuestions.length + 1;
+          let addedCount = 0;
+          let startIndex = 0;
+
+          // Skip header row when present: "number, question, opt1, ..."
+          const firstCell = rows[0]?.[0]?.toLowerCase() ?? '';
+          if (firstCell === 'number' || firstCell === 'no' || firstCell === 'question') {
+            startIndex = 1;
+          }
+
+          for (let i = startIndex; i < rows.length; i += 2) {
+            const row1 = rows[i];
+            const row2 = rows[i + 1];
+            if (!row1 || !row2) continue;
+
+            const isFirstColNum = row1[0] && !isNaN(Number(row1[0]));
+            const qIdx = isFirstColNum ? 1 : 0;
+
+            const questionTitle = row1[qIdx] || `Question ${addedCount + 1}`;
+            const questionText = questionTitle;
+            const optionsArray = row1.slice(qIdx + 1).filter((o) => o.trim() !== '');
+
+            const correctOptionText = row2.find((cell) => cell.trim() !== '')?.trim() || '';
+            let correctOptionIndex = optionsArray.findIndex((opt) => opt.trim() === correctOptionText);
+            if (correctOptionIndex === -1) correctOptionIndex = 0;
+
+            const formattedOptions = optionsArray.map((o) => ({ text: o }));
+            while (formattedOptions.length < 2) {
+              formattedOptions.push({ text: `Option ${String.fromCharCode(65 + formattedOptions.length)}` });
+            }
+
+            const res = await questionService.createMcq({
+              departmentId: targetDeptId,
+              title: questionTitle.substring(0, 50),
+              prompt: questionText,
+              difficulty: 2,
+              marks: 2,
+              options: formattedOptions,
+              correctOptionIndex,
+            });
+
+            await apiPost(`/exams/${examId}/questions`, {
+              questionId: res.id,
+              sequenceNo: nextSequenceNo,
+              marksOverride: 2,
+              negativeMarks: 0,
+              isMandatory: true,
+            });
+            nextSequenceNo++;
+            addedCount++;
+          }
+
+          if (addedCount === 0) {
+            toast({
+              title: "Import Failed",
+              description: "No valid question rows found. Each MCQ needs two rows: question + options, then the correct answer.",
+              variant: "destructive",
+            });
+          } else {
+            toast({ title: "Import Successful", description: `Added ${addedCount} questions.` });
+            loadQuestions();
+          }
+        } catch (err: any) {
+          console.error(err);
+          toast({ title: "Import Failed", description: getErrorMessage(err), variant: "destructive" });
+        } finally {
+          setIsImporting(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+      },
+    });
   };
 
   const handleAddQuestion = async () => {
@@ -284,6 +400,21 @@ export default function QuestionBankPage() {
         subtitle={exam ? `${exam.title} · ${questions.length} questions` : ''}
         actions={
           <div className="flex gap-2">
+            <input
+              type="file"
+              accept=".csv"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isImporting || loading}
+              variant="outline"
+              data-testid="button-import-csv"
+            >
+              <Upload className="w-4 h-4 mr-1.5" /> {isImporting ? 'Importing...' : 'Import CSV'}
+            </Button>
             {exam && exam.status === 'draft' && questions.length > 0 && (
               <Button onClick={handlePublishExam} variant="outline" className="border-primary text-primary hover:bg-primary/10" data-testid="button-publish-exam">
                 Publish Exam

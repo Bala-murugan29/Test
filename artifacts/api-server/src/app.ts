@@ -39,6 +39,15 @@ export function buildApp(): FastifyInstance {
     global: true,
     max: env.RATE_LIMIT_MAX,
     timeWindow: env.RATE_LIMIT_WINDOW_MS,
+    errorResponseBuilder: (_request, context) => ({
+      statusCode: 429,
+      error: "Too many requests",
+      message: context.ban
+        ? "Too many repeated requests. Your access has been temporarily blocked. Please try again later."
+        : `You're sending requests too quickly. Please wait ${context.after} before trying again.`,
+      retryAfter: context.after,
+      expiresIn: context.ttl,
+    }),
   });
 
   app.register(routes, { prefix: "/api" });
@@ -55,9 +64,22 @@ export function buildApp(): FastifyInstance {
     if (statusCode >= 500) {
       console.error("Unhandled 500 error:", error);
     }
-    const message = error instanceof Error ? error.stack || error.message : "Internal Server Error";
+    const isKnownHttpError =
+      error instanceof Error &&
+      "statusCode" in error &&
+      typeof error.statusCode === "number";
+
+    const message = isKnownHttpError
+      ? error.message
+      : statusCode >= 500
+        ? "Internal Server Error"
+        : error instanceof Error
+          ? error.message
+          : "Request failed";
+
     reply.status(statusCode).send({
-      error: statusCode >= 500 ? message : message,
+      error: message,
+      message,
       requestId: request.id,
     });
   });

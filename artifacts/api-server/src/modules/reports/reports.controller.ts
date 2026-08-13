@@ -1,6 +1,21 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { exportQuerySchema } from "./reports.schemas";
 import * as reportsService from "./reports.service";
+import * as reportsRepo from "./reports.repository";
+import { HttpError } from "../../shared/errors/http-error";
+
+function toNumber(value: unknown): number {
+  if (typeof value === "number") return value;
+  if (
+    value &&
+    typeof value === "object" &&
+    "toNumber" in value &&
+    typeof (value as { toNumber: () => number }).toNumber === "function"
+  ) {
+    return (value as { toNumber: () => number }).toNumber();
+  }
+  return Number(value ?? 0);
+}
 
 export async function getExamReportController(
   request: FastifyRequest,
@@ -40,49 +55,61 @@ export async function exportExamResultsController(
   reply: FastifyReply,
 ) {
   const { examId } = request.params as { examId: string };
-  const query = exportQuerySchema.parse(request.query);
+  exportQuerySchema.parse(request.query);
 
-  const results = await reportsService.generateExamReport(request.server, examId);
+  const sessions = await reportsRepo.exportExamResults(request.server, examId);
+  if (sessions.length === 0) {
+    throw new HttpError(404, "Exam not found");
+  }
 
-  const rows = results.questionWiseAnalysis.map(
-    (q: {
-      questionId: string;
-      title: string;
-      type: string;
-      totalAttempts: number;
-      correctAttempts: number;
-      avgMarks: number;
-      maxMarks: number;
-      correctRate: number;
-    }) => ({
-      questionId: q.questionId,
-      title: q.title,
-      type: q.type,
-      totalAttempts: q.totalAttempts,
-      correctAttempts: q.correctAttempts,
-      avgMarks: q.avgMarks,
-      maxMarks: q.maxMarks,
-      correctRate: q.correctRate,
-    }),
-  );
+  const evaluatedSessions = sessions
+    .filter((session) => session.result !== null)
+    .sort(
+      (a, b) =>
+        toNumber(b.result!.percentage) - toNumber(a.result!.percentage),
+    );
+
+  const rows = evaluatedSessions.map((session, index) => ({
+    rank: index + 1,
+    studentId: session.user.id,
+    studentName: session.user.fullName,
+    email: session.user.email,
+    obtainedMarks: session.result!.obtainedMarks,
+    maxMarks: session.result!.maxMarks,
+    percentage: toNumber(session.result!.percentage),
+    status: session.result!.passed ? "Passed" : "Failed",
+    grade: session.result!.grade ?? "",
+    submittedAt: session.result!.evaluatedAt.toISOString(),
+  }));
 
   const headers = [
-    "questionId",
-    "title",
-    "type",
-    "totalAttempts",
-    "correctAttempts",
-    "avgMarks",
+    "rank",
+    "studentId",
+    "studentName",
+    "email",
+    "obtainedMarks",
     "maxMarks",
-    "correctRate",
+    "percentage",
+    "status",
+    "grade",
+    "submittedAt",
   ];
 
   const csv = await reportsService.exportToCsv(rows, headers);
+  const examTitle = sessions[0]?.exam?.title ?? "exam";
+  const safeTitle = examTitle
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
   return reply
     .code(200)
-    .header("Content-Type", "text/csv")
-    .header("Content-Disposition", `attachment; filename="exam-${examId}-report.csv"`)
+    .header("Content-Type", "text/csv; charset=utf-8")
+    .header(
+      "Content-Disposition",
+      `attachment; filename="${safeTitle || "exam"}-results.csv"`,
+    )
     .send(csv);
 }
 

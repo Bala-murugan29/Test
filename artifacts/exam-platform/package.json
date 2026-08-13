@@ -45,6 +45,7 @@
     "@tailwindcss/vite": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@types/node": "catalog:",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
@@ -77,6 +78,7 @@
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
     "axios": "^1.18.1",
+    "papaparse": "^5.5.4",
     "zustand": "^5.0.14"
   }
 }

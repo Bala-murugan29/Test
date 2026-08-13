@@ -73,7 +73,7 @@ export default function ExamScreen() {
   }, [loading]);
 
   // Anti-Cheat integration
-  const { isFullScreen, requestFullScreen } = useAntiCheat({
+  const { isFullScreen, isExtensionSpoofing, requestFullScreen } = useAntiCheat({
     onAutoSubmit: () => {
       setLocation(`/student/exams/${examId}/submit`, { replace: true });
     },
@@ -102,7 +102,7 @@ export default function ExamScreen() {
     }
   }, [currentQuestionIndex, navigateToQuestion]);
 
-  if (loading || !exam || questions.length === 0) {
+  if (loading || !exam) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <LoadingSpinner size="lg" message="Loading exam..." />
@@ -110,7 +110,39 @@ export default function ExamScreen() {
     );
   }
 
+  if (questions.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-6">
+        <div className="text-center max-w-md">
+          <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-2">No Questions Found</h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            This exam has no questions loaded. Please contact your instructor or return to the instructions.
+          </p>
+          <Button onClick={() => setLocation(`/student/exams/${examId}/instructions`)}>
+            Back to Instructions
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   const currentQuestion = questions[currentQuestionIndex];
+
+  if (isExtensionSpoofing) {
+    return (
+      <div className="fixed inset-0 z-[99999] bg-background text-foreground flex flex-col items-center justify-center p-6 text-center">
+        <AlertTriangle className="w-16 h-16 text-destructive mb-6" />
+        <h2 className="text-2xl font-bold mb-2">Anti-Cheat Violation</h2>
+        <p className="text-muted-foreground max-w-md mb-8">
+          We detected an extension or script that modifies browser visibility (e.g., "Always Active Window"). Please disable it to enter the exam.
+        </p>
+        <Button size="lg" onClick={() => window.location.reload()}>
+          Reload Page
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <>

@@ -43,7 +43,7 @@ function formatResult(r: ResultWithSession) {
       examId: r.session.examId,
       attemptNo: r.session.attemptNo,
       exam: r.session.exam ? { title: r.session.exam.title } : null,
-      user: r.session.user ? { fullName: r.session.user.fullName, email: r.session.user.email } : null,
+      user: r.session.user ? { id: r.session.user.id, fullName: r.session.user.fullName, email: r.session.user.email } : null,
     } : null,
   };
 }

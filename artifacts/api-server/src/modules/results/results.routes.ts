@@ -37,6 +37,15 @@ const resultResponseSchema = {
             title: { type: "string" },
           },
         },
+        user: {
+          type: "object",
+          nullable: true,
+          properties: {
+            id: { type: "string" },
+            fullName: { type: "string" },
+            email: { type: "string" },
+          },
+        },
       },
     },
   },

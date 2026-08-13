@@ -35,12 +35,31 @@ export default function ExamInstructionsPage() {
     setStarting(true);
     setStartError(null);
     try {
+      const questions = await examService.getExamQuestions(exam.id);
+      if (questions.length === 0) {
+        setStartError('This exam has no questions yet. Please contact your instructor.');
+        setStarting(false);
+        return;
+      }
+
+      const hasCoding = questions.some((q) => q.type === 'coding');
+      const hasMcq = questions.some((q) => q.type !== 'coding');
+
       // Create (or resume) the backend exam session first.
       const session = await apiPost<{ id: string }>('/sessions', { examId: exam.id });
       // Initialise the local timer/answer store and persist the backend session ID.
       startSession(exam.id, exam.durationMinutes, session.id);
       setSessionId(session.id);
-      setLocation(`/student/exams/${exam.id}/code`);
+
+      // Coding screen only when the exam actually includes coding questions.
+      if (hasCoding) {
+        setLocation(`/student/exams/${exam.id}/code`);
+      } else if (hasMcq) {
+        setLocation(`/student/exams/${exam.id}/take`);
+      } else {
+        setStartError('This exam has no supported question types. Please contact your instructor.');
+        setStarting(false);
+      }
     } catch (err: any) {
       const msg =
         err?.response?.data?.message ||

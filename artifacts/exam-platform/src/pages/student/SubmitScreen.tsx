@@ -11,17 +11,28 @@ import { useExamSession } from '@/hooks/useExamSession';
 import { useExamSessionStore } from '@/store/exam-session.store';
 import { useAuth } from '@/hooks/useAuth';
 import { Exam, Question } from '@/types';
+import { useToast } from '@/hooks/use-toast';
+import { toApiError } from '@/lib/axios';
 
 export default function SubmitScreen() {
   const { examId } = useParams<{ examId: string }>();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const { answers, flaggedQuestions, timeRemainingSeconds, submitExam, clearSession } = useExamSession();
+  const { toast } = useToast();
+  const {
+    answers,
+    flaggedQuestions,
+    timeRemainingSeconds,
+    submitExam,
+    clearSession,
+    sessionId,
+  } = useExamSession();
   const [exam, setExam] = useState<Exam | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const storeExamId = useExamSessionStore((s) => s.examId);
 
@@ -47,13 +58,28 @@ export default function SubmitScreen() {
   const handleConfirmSubmit = async () => {
     if (!examId || !user) return;
     setSubmitting(true);
+    setSubmitError(null);
+    setConfirmOpen(false);
     try {
-      await resultService.submitExam(examId, user.id, answers, questions);
+      await resultService.submitExam(
+        examId,
+        user.id,
+        answers,
+        questions,
+        sessionId ?? undefined,
+      );
       submitExam();
       clearSession();
       setLocation(`/student/exams/${examId}/result`, { replace: true });
-    } catch {
+    } catch (err) {
+      const message = toApiError(err).message;
+      setSubmitError(message);
       setSubmitting(false);
+      toast({
+        title: 'Submission failed',
+        description: message,
+        variant: 'destructive',
+      });
     }
   };
 
@@ -113,6 +139,13 @@ export default function SubmitScreen() {
             <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 mb-5 text-xs text-amber-800 dark:text-amber-400">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span>You have {unansweredCount} unanswered question{unansweredCount > 1 ? 's' : ''}. Unattempted questions will not be scored.</span>
+            </div>
+          )}
+
+          {submitError && (
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 mb-5 text-xs text-red-700 dark:text-red-400">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span>{submitError}</span>
             </div>
           )}
 

@@ -18,7 +18,8 @@ interface BackendResult {
   session?: {
     examId: string;
     attemptNo: number;
-    exam?: { title: string; courseId: string };
+    exam?: { title: string; courseId?: string };
+    user?: { id?: string; fullName: string; email?: string };
   };
 }
 
@@ -35,8 +36,8 @@ function mapResult(r: BackendResult): ExamResult {
   return {
     id: r.id,
     examId: r.session?.examId ?? '',
-    studentId: '',
-    studentName: '',
+    studentId: r.session?.user?.id ?? '',
+    studentName: r.session?.user?.fullName || r.session?.user?.email || '',
     totalMarks: r.maxMarks,
     obtainedMarks: r.obtainedMarks,
     percentage: Math.round(r.percentage * 100) / 100,
@@ -64,25 +65,16 @@ async function fetchAllResults(url: string): Promise<BackendResult[]> {
 export const resultService = {
   async submitExam(
     examId: string,
-    _studentId: string,
+    studentId: string,
     answers: Record<string, string>,
     questions: { id: string; type: string }[] = [],
+    existingSessionId?: string,
   ): Promise<ExamResult> {
-    // 1. Start a session (or get existing one).
-    let sessionId = '';
-    try {
+    // 1. Use the active session from the exam flow, or resume/create one.
+    let sessionId = existingSessionId ?? '';
+    if (!sessionId) {
       const session = await apiPost<{ id: string }>('/sessions', { examId });
       sessionId = session.id;
-    } catch {
-      // Session may already exist — try to find it.
-      const sessions = await apiGet<Paginated<{ id: string; status: string }>>(`/exams/${examId}/sessions`, {
-        params: { page: 1, limit: 1 },
-      });
-      if (sessions.data.length > 0) {
-        sessionId = sessions.data[0].id;
-      } else {
-        throw new Error('Could not start or find exam session.');
-      }
     }
 
     // 2. Save all answers via autosave.
@@ -95,24 +87,27 @@ export const resultService = {
         codeAnswer: isCoding ? answerValue : undefined,
       };
     });
-    await apiPut(`/sessions/${sessionId}/answers`, { answers: answerEntries });
+    if (answerEntries.length > 0) {
+      await apiPut(`/sessions/${sessionId}/answers`, { answers: answerEntries });
+    }
 
     // 3. Submit the session.
     await apiPost(`/sessions/${sessionId}/submit`);
 
-    // 4. Evaluate the result.
-    const results = await apiGet<Paginated<BackendResult>>(`/exams/${examId}/results`, {
-      params: { page: 1, limit: 1 },
-    });
-    if (results.data.length > 0) {
-      return mapResult(results.data[0]);
+    // 4. Load this student's result for the exam (API returns a plain array, not paginated).
+    const studentResults = await fetchAllResults(`/students/${studentId}/results`);
+    const match =
+      studentResults.find((r) => r.session?.examId === examId) ??
+      studentResults.find((r) => r.sessionId === sessionId);
+    if (match) {
+      return mapResult(match);
     }
 
     // Fallback result if evaluation isn't immediate.
     return {
       id: 'pending',
       examId,
-      studentId: _studentId,
+      studentId,
       studentName: '',
       totalMarks: 100,
       obtainedMarks: 0,

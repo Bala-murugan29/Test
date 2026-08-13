@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useGenerateAiQuestions } from "@workspace/api-client-react";
+import { notifyError } from "@/hooks/queries/mutation-helpers";
 import { Textarea } from "@/components/ui/textarea";
 
 export function AIQuestionGeneratorPage() {
@@ -26,11 +27,7 @@ export function AIQuestionGeneratorPage() {
         });
       },
       onError: (error) => {
-        toast({
-          title: "Generation failed",
-          description: error.message || "Could not generate questions.",
-          variant: "destructive",
-        });
+        notifyError(error, "Generation failed");
       },
     },
   });

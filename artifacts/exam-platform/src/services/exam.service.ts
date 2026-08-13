@@ -152,7 +152,7 @@ function mapExam(e: BackendExamListItem | BackendExamDetail): Exam {
   };
 }
 
-function mapQuestion(q: BackendQuestion, examId: string): Question {
+function mapQuestion(q: BackendQuestion, examId: string, eq?: BackendExamQuestion): Question {
   return {
     id: q.id,
     examId,
@@ -160,8 +160,8 @@ function mapQuestion(q: BackendQuestion, examId: string): Question {
     type: q.type === 'MCQ' ? 'mcq' : q.type === 'CODING' ? 'coding' : 'mcq',
     options: q.mcq?.options.map((o, i) => ({ id: String(i), text: o.text })) ?? [],
     correctOptionId: q.mcq ? String(q.mcq.correctOptionIndex) : '',
-    marks: q.marks,
-    negativeMarks: 0,
+    marks: eq?.marksOverride ?? q.marks,
+    negativeMarks: eq?.negativeMarks ?? 0,
     coding: q.coding
       ? {
           starterCode: q.coding.starterCode ?? undefined,
@@ -236,10 +236,17 @@ export const examService = {
   async getExamQuestions(examId: string): Promise<Question[]> {
     try {
       const detail = await apiGet<BackendExamDetail>(`/exams/${examId}`);
-      const questions = await Promise.all(
-        detail.questions.map((eq) => apiGet<BackendQuestion>(`/questions/${eq.questionId}`)),
+      const sorted = [...detail.questions].sort((a, b) => a.sequenceNo - b.sequenceNo);
+      const results = await Promise.allSettled(
+        sorted.map((eq) =>
+          apiGet<BackendQuestion>(`/questions/${eq.questionId}`).then((q) =>
+            mapQuestion(q, examId, eq),
+          ),
+        ),
       );
-      return questions.map((q) => mapQuestion(q, examId));
+      return results
+        .filter((r): r is PromiseFulfilledResult<Question> => r.status === 'fulfilled')
+        .map((r) => r.value);
     } catch {
       return [];
     }
